@@ -1,12 +1,12 @@
 # ViperCue · visual walkthrough
 
-ViperCue is a floating macOS interview companion with an animated viper-head mark. English is the default interface; Serbian is available for the interface, transcription, questions, and prepared answers.
+ViperCue is a floating macOS interview companion with an animated, coiled viper mark. English is the default interface; Serbian is available for the interface, transcription, questions, and prepared answers.
 
 ## Meet-style concept scene
 
 ![ViperCue illustrative video interview](images/08-meet-promo.png)
 
-This is a composed product illustration, not a recording of a Meet call. It shows a fictional AI-generated interviewer labeled John Doe, an edited portrait supplied by the creator labeled Peter Neuner, and an actual ViperCue interface capture. The original personal photo is not part of this repository. The editable layout is [meet-promo.html](meet-promo.html).
+This is a composed product illustration, not a recording of a Meet call. It shows a fictional AI-generated interviewer labeled Maria Bacardi, an edited portrait supplied by the creator labeled Petar Nojner, and an actual ViperCue interface capture floating across the center of the call. The original personal photo is not part of this repository. The editable layout is [meet-promo.html](meet-promo.html).
 
 ## Start a session
 

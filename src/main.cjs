@@ -65,8 +65,8 @@ function createWindow() {
   window = new BrowserWindow({
     width: 510,
     height: Math.min(700, display.height - 48),
-    x: Math.round(display.x + display.width - 545),
-    y: Math.round(display.y + 36),
+    x: Math.round(display.x + (display.width - 510) / 2),
+    y: Math.round(display.y + (display.height - Math.min(700, display.height - 48)) / 2),
     minWidth: 390,
     minHeight: 310,
     transparent: true,

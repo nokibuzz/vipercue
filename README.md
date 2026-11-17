@@ -4,11 +4,11 @@
 
 Created by [@nokibuzz](https://github.com/nokibuzz).
 
-![ViperCue icon: a striking viper head](src/assets/vipercue-viper.svg)
+![ViperCue icon: a powerful coiled viper](src/assets/vipercue-viper.png)
 
 ![Illustrative interview scene with the ViperCue overlay](portfolio/images/08-meet-promo.png)
 
-The scene above combines an edited creator portrait, a fictional AI-generated interviewer and an actual app capture. It is a concept illustration, not a recording of a real meeting. The interface mark animates; the macOS app icon is static.
+The scene above combines an edited creator portrait, a fictional AI-generated interviewer and an actual app capture. It is a concept illustration, not a recording of a real meeting. The viper illustration crouches and lunges on the setup screen and pauses during a live session. The macOS app icon is static. Motion stops when the system requests **Reduce Motion**, in line with [Apple's motion guidance](https://developer.apple.com/design/human-interface-guidelines/motion) and [W3C's reduced-motion technique](https://www.w3.org/WAI/WCAG22/Techniques/css/C39.html).
 
 | Live answer | Offline practice |
 | --- | --- |
@@ -24,7 +24,7 @@ The [live offline library](src/data/interview-questions.md) has 47 bilingual ent
 
 ## Install
 
-The current macOS package targets **Intel x64**. Download the [ViperCue 0.8.1 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.8.1/ViperCue-0.8.1.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline and Mock. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock and system audio capture permission for Live when prompted.
+The current macOS package targets **Intel x64**. Download the [ViperCue 0.8.2 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.8.2/ViperCue-0.8.2.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline and Mock. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock and system audio capture permission for Live when prompted.
 
 To build from a checkout on macOS:
 
@@ -41,7 +41,7 @@ The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/w
 npm run dist:mac
 ```
 
-The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.8.1) contains the distributable DMG.
+The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.8.2) contains the distributable DMG.
 
 ## First session
 

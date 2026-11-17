@@ -7,9 +7,13 @@
 .provider-row .choice{padding:8px 7px;font-size:9px;letter-spacing:.3px}.provider-row .choice small{font-size:8px}
 .dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:11px 0}.dashboard-cell{display:flex;flex-direction:column;gap:3px;padding:7px;border:1px solid #5a805f66;border-radius:5px;background:#9af5b10a}.dashboard-cell span{color:#8eae95;font-size:9px}.dashboard-cell strong{color:#d4ffdd;font-size:15px}.dashboard-breakdown{grid-column:1/-1;color:#9ebca5;white-space:pre-line;line-height:1.7;font-size:9px}
 #providerBadge{margin-left:auto;color:#9af5b1;font-size:8px;letter-spacing:.3px}#languageBadge{margin-left:5px}
-.brand-icon{width:28px;height:28px;flex:none;filter:drop-shadow(0 0 5px #8cf2a644);animation:viper-breathe 3.6s ease-in-out infinite}
-@keyframes viper-breathe{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-2px) rotate(2deg)}}
-@media (prefers-reduced-motion:reduce){.brand-icon{animation:none}}
+.brand-icon{width:36px;height:36px;flex:none;object-fit:contain;transform-origin:50% 72%;filter:drop-shadow(0 0 8px #75de8759);animation:viper-breathe 6.4s ease-in-out infinite}
+@keyframes viper-breathe{0%,44%,100%{transform:translate(0,0) scale(1)}52%{transform:translate(-2px,2px) scale(.97)}59%{transform:translate(4px,-4px) scale(1.12)}68%{transform:translate(0,0) scale(1)}}
+@keyframes viper-strike{0%{transform:translate(0,0) scale(1)}35%{transform:translate(-3px,3px) scale(.96)}58%{transform:translate(5px,-6px) scale(1.18)}100%{transform:translate(0,0) scale(1)}}
+.brand-icon:hover,.intro-viper:hover{animation:viper-strike .72s cubic-bezier(.22,.9,.24,1) both}
+.shell:has(.session:not(.hidden)) .brand-icon{animation:none}
+.intro{position:relative;min-height:88px;padding-right:93px}.intro-viper{position:absolute;right:0;top:-10px;width:82px;height:82px;object-fit:contain;transform-origin:50% 75%;filter:drop-shadow(0 9px 12px #0008);animation:viper-breathe 6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.brand-icon,.brand-icon:hover,.intro-viper,.intro-viper:hover{animation:none}}
 html:lang(sr) .session-status{font-size:8px;letter-spacing:.65px}
 html:lang(sr) #providerBadge{font-size:7px;white-space:nowrap}
 .mock-spoken{margin-top:auto;padding-top:8px;border-top:1px solid #9af5b126;color:#9cbda5;font-size:10px;line-height:1.4;white-space:pre-wrap;max-height:82px;overflow:auto}

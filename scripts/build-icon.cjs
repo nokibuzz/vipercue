@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 
 function build() {
   const root = path.join(__dirname, '..');
-  const source = path.join(root, 'src', 'assets', 'vipercue-viper.svg');
+  const source = path.join(root, 'src', 'assets', 'vipercue-viper.png');
   const iconset = path.join(root, 'assets', 'ViperCue.iconset');
   fs.mkdirSync(iconset, { recursive: true });
   for (const size of [16, 32, 128, 256, 512]) {

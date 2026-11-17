@@ -1,6 +1,6 @@
 {
   "name": "vipercue",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Offline interview practice and live question companion",
   "main": "src/main.cjs",
   "license": "UNLICENSED",
