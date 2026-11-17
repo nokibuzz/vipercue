@@ -26,7 +26,11 @@ esac
 
 npm run pack:local
 
-app_source="$project_dir/dist/mac/ViperCue.app"
+if [ "$mac_arch" = arm64 ]; then
+  app_source="$project_dir/dist/mac-arm64/ViperCue.app"
+else
+  app_source="$project_dir/dist/mac/ViperCue.app"
+fi
 [ -d "$app_source" ] || { echo 'The local build did not produce ViperCue.app.' >&2; exit 1; }
 lipo "$app_source/Contents/MacOS/ViperCue" -verify_arch "$mac_arch" >/dev/null 2>&1 || {
   echo "The built app does not contain the expected $mac_arch architecture." >&2

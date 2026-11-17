@@ -37,13 +37,17 @@ jobs:
       - name: Build ad-hoc signed DMG
         env:
           BUILD_ARCH: ${{ matrix.arch }}
-        run: npx electron-builder --mac dmg "--$BUILD_ARCH" -c.mac.identity=-
+        run: npx electron-builder --mac dmg "--$BUILD_ARCH" -c.mac.identity=- --publish never
       - name: Verify architecture and package
         env:
           EXPECTED_ARCH: ${{ matrix.expected }}
           BUILD_ARCH: ${{ matrix.arch }}
         run: |
-          app=dist/mac/ViperCue.app
+          if [ "$BUILD_ARCH" = arm64 ]; then
+            app=dist/mac-arm64/ViperCue.app
+          else
+            app=dist/mac/ViperCue.app
+          fi
           lipo "$app/Contents/MacOS/ViperCue" -verify_arch "$EXPECTED_ARCH"
           lipo "$app/Contents/Resources/whisper/whisper-cli" -verify_arch "$EXPECTED_ARCH"
           lipo "$app/Contents/Resources/shift-monitor/shift-monitor" -verify_arch "$EXPECTED_ARCH"
@@ -51,8 +55,14 @@ jobs:
           codesign --verify --deep --strict "$app"
           test -s "dist/ViperCue-0.9.1-$BUILD_ARCH.dmg"
       - name: Smoke-test bundled speech recognition
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
         run: |
-          app=dist/mac/ViperCue.app
+          if [ "$BUILD_ARCH" = arm64 ]; then
+            app=dist/mac-arm64/ViperCue.app
+          else
+            app=dist/mac/ViperCue.app
+          fi
           say -o "$RUNNER_TEMP/vipercue-speech.aiff" 'The database connection pool is overloaded.'
           afconvert "$RUNNER_TEMP/vipercue-speech.aiff" "$RUNNER_TEMP/vipercue-speech.wav" -f WAVE -d LEI16@16000
           transcript=$("$app/Contents/Resources/whisper/whisper-cli" \

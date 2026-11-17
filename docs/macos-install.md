@@ -32,7 +32,7 @@ npm run install:local
 open "$HOME/Applications/ViperCue.app"
 ```
 
-`install:local` builds the bundled Whisper binary and model and then packages ViperCue for the current Mac. It verifies that the app, Whisper, and Shift helper match the active architecture, ad-hoc signs the local app, and installs into your user-level `~/Applications` directory. A previous local copy is saved under `~/Library/Application Support/ViperCue/local-install-backups/`. The first build downloads the model and can take several minutes. The generated app is in `dist/mac/`; the app installed by this command is built locally and is not the downloaded GitHub DMG. Run `npm run dist:mac` separately if you also need a DMG and ZIP.
+`install:local` builds the bundled Whisper binary and model and then packages ViperCue for the current Mac. It verifies that the app, Whisper, and Shift helper match the active architecture, ad-hoc signs the local app, and installs into your user-level `~/Applications` directory. A previous local copy is saved under `~/Library/Application Support/ViperCue/local-install-backups/`. The first build downloads the model and can take several minutes. The generated app is in `dist/mac/` on Intel or `dist/mac-arm64/` on Apple Silicon; the installed app is built locally and is not the downloaded GitHub DMG. Run `npm run dist:mac` separately if you also need a DMG and ZIP.
 
 To run directly from the checkout without installing an app bundle, use `npm start` after `npm install`.
 
