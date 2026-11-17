@@ -9,7 +9,9 @@
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
     "predist:mac": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh",
-    "dist:mac": "electron-builder --mac dmg zip"
+    "dist:mac": "electron-builder --mac dmg zip",
+    "pack:local": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh && electron-builder --mac dir",
+    "install:local": "sh scripts/install-local.sh"
   },
   "build": {
     "appId": "app.vipercue.interview",

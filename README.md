@@ -26,7 +26,21 @@ The [live offline library](src/data/interview-questions.md) has 47 bilingual ent
 
 ## Install
 
-The current macOS package targets **Intel x64**. Download the [ViperCue 0.9.0 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.0/ViperCue-0.9.0.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline, Mock, or an Offline ASMA checklist. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock or workshop capture and system audio capture permission for Live when prompted.
+The current [ViperCue 0.9.0 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.0/ViperCue-0.9.0.dmg) targets **Intel x64**. It is **unsigned and not notarized**. macOS Gatekeeper can block this downloaded app with an “Apple cannot check it for malicious software” warning; a GitHub download does not make it trusted by Apple. For that specific warning, use Apple's [Privacy & Security → Open Anyway procedure](https://support.apple.com/en-us/102445) after dragging the app to Applications. If the alert says the app **“will damage your computer”** or **“is damaged”**, do not override it; use the [source-build instructions](docs/macos-install.md) and report the exact message. Apple Silicon users should build locally for a native arm64 app.
+
+For a local installation from source on either Intel or Apple Silicon:
+
+```bash
+xcode-select --install
+brew install cmake
+git clone https://github.com/nokibuzz/vipercue.git
+cd vipercue
+npm install
+npm run install:local
+open "$HOME/Applications/ViperCue.app"
+```
+
+Use a **native Node.js 22.12 or newer** and install Homebrew if you use the `brew` command. `install:local` builds speech recognition and the app for the current Mac, checks both architectures, and installs into `~/Applications` with a backup of any previous local copy. The first build downloads whisper.cpp and its multilingual model and can take several minutes. See [macOS installation and Gatekeeper details](docs/macos-install.md). Grant Microphone access for Mock or workshop capture and system audio capture permission for Live when prompted.
 
 To build from a checkout on macOS:
 
@@ -37,13 +51,13 @@ npm install
 npm start
 ```
 
-The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and its multilingual base model if they are missing. That one-time step needs internet access and can take several minutes. You also need Node.js 20 or newer and Xcode Command Line Tools. To create a DMG and ZIP:
+The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and its multilingual base model if they are missing. That one-time step needs internet access and can take several minutes. You also need Node.js 22.12 or newer and Xcode Command Line Tools. To create a DMG and ZIP:
 
 ```bash
 npm run dist:mac
 ```
 
-The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.0) contains the distributable DMG.
+The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.0) contains the unsigned Intel DMG; a local build is the supported fallback until a Developer ID-signed and notarized release is available.
 
 ## First session
 
