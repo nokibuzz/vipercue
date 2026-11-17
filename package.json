@@ -1,0 +1,53 @@
+{
+  "name": "vipercue",
+  "version": "0.8.1",
+  "description": "Offline interview practice and live question companion",
+  "main": "src/main.cjs",
+  "license": "UNLICENSED",
+  "scripts": {
+    "prestart": "sh scripts/setup-local-model.sh && sh scripts/build-shift-monitor.sh",
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "predist:mac": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh",
+    "dist:mac": "electron-builder --mac dmg zip"
+  },
+  "build": {
+    "appId": "app.vipercue.interview",
+    "productName": "ViperCue",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/ViperCue.icns",
+      "extraResources": [
+        {
+          "from": "vendor/whisper/build/bin/whisper-cli",
+          "to": "whisper/whisper-cli"
+        },
+        {
+          "from": "vendor/whisper/model/ggml-base.bin",
+          "to": "whisper/ggml-base.bin"
+        },
+        {
+          "from": "vendor/shift-monitor/shift-monitor",
+          "to": "shift-monitor/shift-monitor"
+        }
+      ],
+      "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Capture meeting audio to show a live transcript.",
+        "NSScreenCaptureDescription": "Capture system audio from a meeting window.",
+        "NSMicrophoneUsageDescription": "Use microphone audio when system audio is unavailable."
+      }
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
+    "ws": "^8.18.3"
+  }
+}

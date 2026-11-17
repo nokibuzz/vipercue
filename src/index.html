@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:">
+  <title>ViperCue</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell" id="shell">
+    <header class="titlebar">
+      <div class="brand"><img class="brand-icon" src="assets/vipercue-viper.svg" alt=""><span>Viper<span class="accent">Cue</span></span></div>
+      <div class="header-controls">
+        <label class="opacity-control" for="opacity" data-i18n-title="Window transparency"><span>◐</span><input id="opacity" type="range" min="2" max="65" value="12" data-i18n-aria="Window transparency"><output id="opacityValue">12%</output></label>
+        <button id="fontDown" class="font-control" type="button" data-i18n-title="Decrease answer text size">A−</button><button id="fontUp" class="font-control" type="button" data-i18n-title="Increase answer text size">A+</button>
+        <button id="usageToggle" class="usage-toggle" type="button" data-i18n-title="Beta usage statistics" data-i18n-aria="Show or hide usage statistics" aria-pressed="false">β</button>
+        <button id="minimize" data-i18n-title="Minimize" data-i18n-aria="Minimize">−</button>
+        <button id="close" data-i18n-title="Close" data-i18n-aria="Close">×</button>
+      </div>
+    </header>
+    <section id="setup" class="setup">
+      <div class="intro"><span class="eyebrow" data-i18n="LIVE INTERVIEW COMPANION">LIVE INTERVIEW COMPANION</span><h1 data-i18n="Ready when you are.">Ready when you are.</h1><p data-i18n="Choose your language and audio source. Offline mode recognizes speech and finds prepared answers without AI tokens.">Choose your language and audio source. Offline mode recognizes speech and finds prepared answers without AI tokens.</p></div>
+      <div class="field"><span class="field-label" data-i18n="APP LANGUAGE">APP LANGUAGE</span><div class="choice-row"><button id="uiEnglish" class="choice selected" type="button">ENGLISH</button><button id="uiSerbian" class="choice" type="button">SRPSKI</button></div></div>
+      <div class="field"><span class="field-label" data-i18n="MODE">MODE</span><div class="choice-row"><button id="liveMode" class="choice selected" type="button">LIVE <small data-i18n="question + answer">question + answer</small></button><button id="mockMode" class="choice" type="button">MOCK <small data-i18n="offline interview practice">offline interview practice</small></button></div></div>
+      <div class="field" id="captureModeField"><span class="field-label" data-i18n="QUESTION CAPTURE">QUESTION CAPTURE</span><div class="choice-row"><button id="autoCapture" class="choice selected" type="button"><span data-i18n="AUTOMATIC">AUTOMATIC</span> <small data-i18n="after a speech pause">after a speech pause</small></button><button id="manualCapture" class="choice" type="button"><span data-i18n="MANUAL">MANUAL</span> <small data-i18n="Shift or button">Shift or button</small></button></div></div>
+      <div class="field hidden" id="mockCategoryField"><label class="field-label" for="mockCategory" data-i18n="PRACTICE TOPIC">PRACTICE TOPIC</label><select id="mockCategory"><option value="all" data-i18n="Mixed interview">Mixed interview</option><option value="HR">HR</option><option value="Java">Java</option><option value="React">React</option><option value="Python">Python</option><option value=".NET">.NET</option><option value="DevOps">DevOps</option><option value="Front-end">Front-end</option><option value="Data analytics">Data analytics</option><option value="Systems">Systems</option></select><p class="share-note" data-i18n="Mock uses your microphone and a prepared Markdown deck. No account or AI tokens are needed.">Mock uses your microphone and a prepared Markdown deck. No account or AI tokens are needed.</p></div>
+      <div class="field"><span class="field-label" data-i18n="SPOKEN LANGUAGE">SPOKEN LANGUAGE</span><div class="choice-row"><button id="serbian" class="choice" type="button">SRPSKI</button><button id="english" class="choice selected" type="button">ENGLISH</button></div></div>
+      <div class="field" id="providerField"><span class="field-label" data-i18n="ANSWER SOURCE">ANSWER SOURCE</span><div class="choice-row provider-row"><button id="offlineProvider" class="choice selected" type="button"><span data-i18n="OFFLINE">OFFLINE</span> <small data-i18n="0 AI tokens">0 AI tokens</small></button><button id="codexProvider" class="choice" type="button">CODEX <small data-i18n="AI answer">AI answer</small></button><button id="apiProvider" class="choice" type="button">OPENAI API <small data-i18n="your API key">your API key</small></button></div></div>
+      <div class="field" id="sourceField"><label class="field-label" for="source" data-i18n="AUDIO SOURCE">AUDIO SOURCE</label><select id="source"><option value="system" data-i18n="System audio · Meet / Teams">System audio · Meet / Teams</option><option value="microphone" data-i18n="Microphone · fallback">Microphone · fallback</option></select></div>
+      <div class="field hidden" id="apiKeyField"><label class="field-label" for="apiKey"><span data-i18n="OPENAI API KEY">OPENAI API KEY</span> <span data-i18n="· API mode only">· API mode only</span></label><input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false"></div>
+      <div class="field" id="profileField"><label class="field-label" for="profile"><span data-i18n="YOUR EXPERIENCE">YOUR EXPERIENCE</span> <span data-i18n="· optional, for suggested answers">· optional, for suggested answers</span></label><textarea id="profile" rows="2" data-i18n-placeholder="Relevant skills, projects and experience…" placeholder="Relevant skills, projects and experience…"></textarea></div>
+      <div class="display-settings"><label for="answerFont"><span data-i18n="ANSWER TEXT SIZE">ANSWER TEXT SIZE</span> <output id="answerFontValue">15 px</output></label><input id="answerFont" type="range" min="11" max="22" value="15"><label for="answerArea"><span data-i18n="ANSWER AREA">ANSWER AREA</span> <output id="answerAreaValue">76%</output></label><input id="answerArea" type="range" min="55" max="85" value="76"></div>
+      <label class="usage-opt"><input id="usageEnabled" type="checkbox"> <span data-i18n="Show beta token and quota statistics">Show beta token and quota statistics</span></label>
+      <div id="setupError" class="setup-error hidden" role="alert"></div>
+      <button id="start" class="primary" type="button" data-i18n="▶ START LIVE">▶ START LIVE</button>
+      <p class="share-note" data-i18n="Share a Chrome tab or meeting window. On recent macOS versions, sharing your entire screen may include this overlay.">Share a Chrome tab or meeting window. On recent macOS versions, sharing your entire screen may include this overlay.</p>
+      <p class="share-note" data-i18n="Shift works while Chrome is focused. Hold it for one question, or double tap it to record until the next press.">Shift works while Chrome is focused. Hold it for one question, or double tap it to record until the next press.</p>
+      <details id="historyPanel" class="history-panel"><summary data-i18n="HISTORY & ANALYTICS">HISTORY & ANALYTICS</summary><div id="dashboard" class="dashboard"></div><div id="historyList" class="history-list" data-i18n="Loading…">Loading…</div><button id="historyReveal" type="button" data-i18n="REVEAL LOCAL JSON ↗">REVEAL LOCAL JSON ↗</button></details>
+    </section>
+    <section id="sessionView" class="session hidden">
+      <div class="session-status"><span id="statusDot" class="dot"></span><span id="statusText" data-i18n="LISTENING">LISTENING</span><button id="captureModeButton" type="button">AUTO</button><span id="providerBadge">OFFLINE · 0 TOKENS</span><span id="languageBadge">EN</span></div>
+      <article class="content-card question-card"><div class="card-label"><span>01</span><span id="questionLabel" data-i18n="QUESTION">QUESTION</span></div><div id="question" class="content-text placeholder" data-i18n="Waiting for a question…">Waiting for a question…</div><div id="mockSpoken" class="mock-spoken hidden"></div></article>
+      <article class="content-card answer-card"><div class="card-label"><span>02</span> <span id="answerLabel" data-i18n="SUGGESTED ANSWER">SUGGESTED ANSWER</span></div><div id="answer" class="content-text placeholder" data-i18n="Your answer will appear here.">Your answer will appear here.</div></article>
+      <aside id="usagePanel" class="usage-panel hidden" data-i18n-aria="Beta usage statistics">
+        <div class="usage-title"><span data-i18n="β USAGE">β USAGE</span><button id="usageRefresh" type="button" data-i18n="REFRESH">REFRESH</button></div>
+        <div class="usage-grid"><span data-i18n="Last answer">Last answer</span><strong id="usageLast">—</strong><span data-i18n="This session">This session</span><strong id="usageSession">0 tokens</strong><span data-i18n="Extra credits">Extra credits</span><strong id="usageCredits">—</strong><span id="usageLimitLabel">5 hours / week</span><strong id="usageLimits">—</strong><span data-i18n="Money">Money</span><strong id="usageMoney">Unavailable</strong></div>
+        <div class="usage-foot"><span id="usageNote">Tokens cover AI answers.</span><button id="usageOpen" type="button" data-i18n="ACCOUNT ↗">ACCOUNT ↗</button></div>
+      </aside>
+      <div class="session-actions"><span id="captureHint">SYSTEM AUDIO</span><button id="startQuestions" class="hidden" type="button" data-i18n="▶ START QUESTIONS">▶ START QUESTIONS</button><button id="manualAction" class="hidden" type="button">● RECORD QUESTION</button><button id="mockReveal" class="hidden" type="button" data-i18n="SHOW ANSWER">SHOW ANSWER</button><button id="mockNext" class="hidden" type="button" data-i18n="NEXT QUESTION →">NEXT QUESTION →</button><button id="stop" type="button" data-i18n="■ STOP">■ STOP</button></div>
+    </section>
+  </main>
+  <script src="i18n.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
