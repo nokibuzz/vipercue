@@ -4,7 +4,7 @@ ViperCue is a floating macOS interview companion with an animated, coiled viper 
 
 ## Meet-style concept scene
 
-![ViperCue illustrative video interview](images/08-meet-promo.png)
+![ViperCue floating over the illustrated interview with Maria Bacardi and Petar Nojner](images/meet-maria-petar-nojner.png)
 
 This is a composed product illustration, not a recording of a Meet call. It shows a fictional AI-generated interviewer labeled Maria Bacardi, an edited portrait supplied by the creator labeled Petar Nojner, and an actual ViperCue interface capture floating across the center of the call. The original personal photo is not part of this repository. The editable layout is [meet-promo.html](meet-promo.html).
 

@@ -11,7 +11,7 @@
     .tag{margin-left:auto;color:#b4d4bf;font:700 13px ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase}
     h1{margin:30px 0 9px;font-size:53px;letter-spacing:-.055em;line-height:1.08;max-width:900px}.mint{color:#9af1ac}
     .sub{margin:0 0 25px;color:#b9d1c0;font-size:19px}
-    .meet{position:relative;width:1460px;height:650px;background:#141c1b;border:1px solid #547260;border-radius:22px;box-shadow:0 24px 70px #0009;overflow:hidden}
+    .scene{position:relative;width:1460px;height:650px}.meet{width:100%;height:100%;background:#141c1b;border:1px solid #547260;border-radius:22px;box-shadow:0 24px 70px #0009;overflow:hidden}
     .browser{height:44px;background:#27302e;display:flex;align-items:center;padding:0 17px;gap:9px;color:#d6e6d9;font-size:14px}
     .dot{height:10px;width:10px;border-radius:50%;background:#eb7d77}.dot:nth-child(2){background:#f4c86c}.dot:nth-child(3){background:#83d995}
     .address{margin-left:21px;background:#1b2421;color:#a9bdb0;border-radius:8px;padding:5px 16px;min-width:270px;font-size:12px}
@@ -23,8 +23,8 @@
     .name{position:absolute;bottom:15px;left:16px;padding:7px 12px;border-radius:7px;background:#09120dce;color:#fff;font-size:15px;font-weight:650}
     .controls{height:79px;display:flex;gap:13px;justify-content:center;align-items:center}
     .control{width:43px;height:43px;border-radius:50%;background:#3c4640;display:grid;place-items:center;font-size:20px}.hangup{background:#bd3d3f;width:62px;border-radius:25px}
-    .overlay{position:absolute;left:50%;top:117px;width:370px;transform:translateX(-50%);filter:drop-shadow(0 18px 28px #000e)}
-    .overlay-caption{position:absolute;right:34px;bottom:76px;white-space:nowrap;background:#09190eea;border:1px solid #83e698;border-radius:7px;padding:9px 13px;color:#caffd1;font:700 12px ui-monospace,monospace;letter-spacing:.08em}
+    .overlay{position:absolute;z-index:5;left:50%;top:78px;width:390px;transform:translateX(-50%);filter:drop-shadow(0 24px 34px #000e)}
+    .overlay-caption{position:absolute;z-index:6;right:34px;bottom:76px;white-space:nowrap;background:#09190eea;border:1px solid #83e698;border-radius:7px;padding:9px 13px;color:#caffd1;font:700 12px ui-monospace,monospace;letter-spacing:.08em}
     @keyframes viper-breathe{0%,43%,100%{transform:translateY(0) scale(1)}51%{transform:translateY(-2px) scale(1.035)}58%{transform:translate(2px,-3px) scale(1.07)}66%{transform:translateY(0) scale(1)}}
     @media (prefers-reduced-motion:reduce){.logo{animation:none}}
     footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px;font-size:14px;color:#9fb9a7}
@@ -36,7 +36,7 @@
     <header><img class="logo" src="../src/assets/vipercue-viper.png" alt=""><div class="brand">Viper<span>Cue</span></div><div class="tag">Interview companion · Concept illustration</div></header>
     <h1>Be ready when <span class="mint">the question lands.</span></h1>
     <p class="sub">Local speech recognition. A concise answer beside your call. Offline practice when you need it.</p>
-    <section class="meet" aria-label="Fictional video interview illustration">
+    <div class="scene"><section class="meet" aria-label="Fictional video interview illustration">
       <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">meet.google.com · illustrative call</div></div>
       <div class="topline">Technical interview · Concept conversation <span class="live">● ILLUSTRATIVE DEMO</span></div>
       <div class="tiles">
@@ -44,9 +44,7 @@
         <div class="tile"><img src="images/illustrated-founder.png" alt="Edited portrait of the app creator"><span class="name">Petar Nojner · Candidate</span></div>
       </div>
       <div class="controls"><span class="control">♬</span><span class="control">◉</span><span class="control hangup">⌁</span><span class="control">▣</span><span class="control">⋯</span></div>
-      <img class="overlay" src="images/03-live-en.png" alt="ViperCue application interface">
-      <span class="overlay-caption">FLOATING OVER THE CALL · LOCAL DISPLAY</span>
-    </section>
+    </section><img class="overlay" src="images/03-live-en.png" alt="ViperCue application interface"><span class="overlay-caption">FLOATING OVER THE CALL · LOCAL DISPLAY</span></div>
     <footer><span>Synthetic Meet-style scene · edited personal portrait · fictional interviewer · actual ViperCue interface capture</span><strong>Live answers · Offline rehearsal · EN / SR</strong></footer>
   </main>
 </body>
