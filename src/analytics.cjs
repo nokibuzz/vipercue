@@ -13,6 +13,7 @@ function percentile(values, fraction) {
 function summarize(sessions) {
   const live = (sessions || []).filter(session => session.mode === 'live');
   const practiceQuestions = (sessions || []).filter(session => session.mode === 'mock').flatMap(session => session.questions || []);
+  const feedbackRounds = (sessions || []).filter(session => session.mode === 'feedbacker').flatMap(session => session.questions || []);
   const questions = live.flatMap(session => (session.questions || []).map(question => ({ ...question, provider: session.provider || 'unknown' })));
   const answered = questions.filter(item => ['complete', 'fallback', 'unmatched'].includes(item.status));
   const sumTokens = items => items.reduce((sum, item) => sum + (Number(item.inputTokens) || 0) + (Number(item.outputTokens) || 0), 0);
@@ -39,6 +40,12 @@ function summarize(sessions) {
       questions: practiceQuestions.length,
       completed: practiceQuestions.filter(item => item.status === 'complete').length,
       averageResponseMs: average(practiceQuestions.filter(item => item.status === 'complete').map(item => item.responseDurationMs))
+    },
+    feedback: {
+      rounds: feedbackRounds.length,
+      completed: feedbackRounds.filter(item => item.status === 'complete').length,
+      tokens: sumTokens(feedbackRounds),
+      averageWaitMs: average(feedbackRounds.filter(item => item.status === 'complete').map(item => item.totalProcessingMs))
     }
   };
 }

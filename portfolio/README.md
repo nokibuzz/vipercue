@@ -24,11 +24,19 @@ Live answers can use a local Markdown library, the user's own Codex CLI login, o
 
 These are interface captures populated with demonstration content. They are not recordings of a real interview. In Mock, click **Start Mock**, answer aloud, use **Show Answer**, then **Next Question**. Voice commands include “show answer,” “next question,” and “start MOC” to repeat the current prompt.
 
+## Run an English feedback workshop
+
+| Feedbacker setup | Sample ASMA recap |
+| --- | --- |
+| ![Feedbacker setup](images/08-feedbacker-setup.png) | ![Sample ASMA recap](images/09-feedbacker-demo.png) |
+
+Select the active speaker as the interview question, candidate answer, and two peer reviews are spoken. Then press **Generate ASMA** for a short facilitator recap. These captures contain synthetic dialogue; no real workshop transcript appears in this repository. Codex uses the installed user's login; Offline shows a checklist rather than a generated assessment.
+
 ## Review a session
 
 ![Example local analytics](images/05-dashboard-demo.png)
 
-The dashboard image uses illustrative values. In use, the app computes the live answer count, token totals, average and 90th-percentile wait, recognition and answer times, and a separate practice summary from local history.
+The dashboard image uses illustrative values. In use, the app computes the live answer count, token totals, average and 90th-percentile wait, recognition and answer times, plus separate practice and Feedbacker summaries from local history.
 
 ## Share a selected browser tab
 

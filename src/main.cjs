@@ -13,6 +13,7 @@ const { quickAnswer } = require('./quick-answer.cjs');
 const { findOfflineAnswer, loadBank } = require('./offline-answers.cjs');
 const { MockPractice, loadMockDeck, mockCommand } = require('./mock-practice.cjs');
 const { summarize } = require('./analytics.cjs');
+const { FeedbackRound, makeAsmaPrompt, offlineAsmaScaffold } = require('./feedbacker.cjs');
 
 let window;
 let transcriber;
@@ -36,6 +37,12 @@ let mockTranscriptionMs = 0;
 let sessionSerial = 0;
 let answerAbort;
 let answerSerial = 0;
+let feedbackRound;
+let feedbackEntryId;
+let feedbackBusy = false;
+let feedbackAudioMs = 0;
+let feedbackTranscriptionMs = 0;
+let feedbackGenerating = false;
 let usageTotals = { input: 0, cached: 0, output: 0, answers: 0 };
 const CODEX_MODEL = 'gpt-6-luna';
 const API_MODEL = 'gpt-5-mini';
@@ -107,6 +114,7 @@ function stopSession() {
   stopKeyMonitor?.();
   stopKeyMonitor = undefined;
   if (mockEntryId && mockPractice?.current && !mockPractice.revealed) history?.update(mockEntryId, { status: 'unfinished', candidateAnswer: mockPractice.response });
+  if (feedbackEntryId && feedbackRound) history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
   history?.finish();
   questionGate = undefined;
   mockPractice = undefined;
@@ -114,6 +122,12 @@ function stopSession() {
   mockQuestionStartedAt = 0;
   mockAudioMs = 0;
   mockTranscriptionMs = 0;
+  feedbackRound = undefined;
+  feedbackEntryId = undefined;
+  feedbackBusy = false;
+  feedbackAudioMs = 0;
+  feedbackTranscriptionMs = 0;
+  feedbackGenerating = false;
   currentQuestion = '';
   apiKey = '';
   profile = '';
@@ -150,34 +164,55 @@ function revealMockAnswer() {
   return item;
 }
 
-async function suggestAnswer(question, previousQuestion, entryId, transcriptionMs, instantAnswer = '') {
+function startFeedbackRound(number) {
+  feedbackRound = new FeedbackRound(number);
+  feedbackAudioMs = 0;
+  feedbackTranscriptionMs = 0;
+  feedbackGenerating = false;
+  feedbackEntryId = history?.question({ question: '', answer: '', candidateAnswer: '', reviewer1: '', reviewer2: '', rating: 'auto', source: 'feedbacker', audioMs: 0, transcriptionMs: 0, inputTokens: 0, outputTokens: 0, contextCharacters: 0, model: provider === 'offline' ? 'asma-scaffold-v1' : provider === 'codex' ? CODEX_MODEL : API_MODEL, status: 'capturing', askedAt: new Date().toISOString() });
+  emit('feedback-round', feedbackRound.snapshot());
+  return feedbackRound.snapshot();
+}
+
+async function flushFeedbackSpeech() {
+  feedbackBusy = true;
+  transcriber?.finishTurn();
+  await transcriber?.finalQueue;
+  transcriber?.reset();
+}
+
+async function suggestAnswer(question, previousQuestion, entryId, transcriptionMs, instantAnswer = '', feedback = false) {
   if (provider === 'api' && !apiKey) return;
   answerAbort?.abort();
   const abort = new AbortController();
   answerAbort = abort;
   const serial = ++answerSerial;
-  const prompt = provider === 'offline' ? '' : makePrompt(question, previousQuestion, profile);
+  const roundForAnswer = feedback ? feedbackRound : null;
+  const prompt = provider === 'offline' ? '' : feedback ? makeAsmaPrompt(roundForAnswer) : makePrompt(question, previousQuestion, profile);
   const started = Date.now();
-  const model = provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL;
+  const model = provider === 'offline' ? feedback ? 'asma-scaffold-v1' : OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL;
   history?.update(entryId, { model, contextCharacters: provider === 'offline' ? 0 : prompt.length, generationStartedAt: new Date(started).toISOString(), status: 'generating' });
   let answer = '';
-  if (provider !== 'offline') emit('answer', { question, text: instantAnswer, loading: true });
+  const eventType = feedback ? 'feedback-answer' : 'answer';
+  if (provider !== 'offline') emit(eventType, { question, text: instantAnswer, loading: true });
   try {
     if (provider === 'offline') {
-      const found = findOfflineAnswer(question, language);
+      const found = feedback ? null : findOfflineAnswer(question, language);
       if (serial !== answerSerial) return;
-      const text = found?.answer || (language === 'sr' ? 'Nema pouzdanog lokalnog odgovora za ovo pitanje.' : 'No reliable offline answer found for this question.');
+      const text = feedback ? offlineAsmaScaffold(roundForAnswer) : found?.answer || (language === 'sr' ? 'Nema pouzdanog lokalnog odgovora za ovo pitanje.' : 'No reliable offline answer found for this question.');
+      if (feedback) { roundForAnswer.generated = text; feedbackGenerating = false; }
       const lookupMs = Date.now() - started;
-      history?.update(entryId, { answer: text, matchId: found?.id || null, matchConfidence: found?.confidence || 0, answerSource: found?.source || null, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, generationMs: lookupMs, totalProcessingMs: transcriptionMs + lookupMs, finishedAt: new Date().toISOString(), status: found ? 'complete' : 'unmatched' });
-      emit('answer', { question, text, loading: false });
+      history?.update(entryId, { answer: text, matchId: found?.id || null, matchConfidence: found?.confidence || 0, answerSource: feedback ? 'asma-scaffold' : found?.source || null, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, generationMs: lookupMs, totalProcessingMs: transcriptionMs + lookupMs, finishedAt: new Date().toISOString(), status: feedback || found ? 'complete' : 'unmatched' });
+      emit(eventType, { question, text, loading: false });
       return;
     }
     if (provider === 'codex') {
       const result = await generateWithCodex(prompt, abort.signal, { model });
       if (serial === answerSerial) {
+        if (feedback) { roundForAnswer.generated = result.text; feedbackGenerating = false; }
         const tokens = recordUsage(result.usage) || {};
         history?.update(entryId, { answer: result.text, ...tokens, generationMs: Date.now() - started, totalProcessingMs: transcriptionMs + Date.now() - started, finishedAt: new Date().toISOString(), status: 'complete' });
-        emit('answer', { question, text: result.text, loading: false });
+        emit(eventType, { question, text: result.text, loading: false });
       }
       return;
     }
@@ -187,7 +222,7 @@ async function suggestAnswer(question, previousQuestion, entryId, transcriptionM
       body: JSON.stringify({
         model,
         input: prompt,
-        max_output_tokens: 140,
+        max_output_tokens: feedback ? 240 : 140,
         reasoning: { effort: 'low' },
         stream: true
       }),
@@ -214,7 +249,7 @@ async function suggestAnswer(question, previousQuestion, entryId, transcriptionM
           if (event.type === 'response.output_text.delta') {
             answer += event.delta || '';
             if (serial === answerSerial && (!instantAnswer || answer.trim().length >= 60)) {
-              emit('answer', { question, text: answer, loading: true });
+              emit(eventType, { question, text: answer, loading: true });
             }
           } else if (event.type === 'error' || event.type === 'response.failed') {
             throw new Error(event.error?.message || event.response?.error?.message || 'AI request failed');
@@ -226,13 +261,15 @@ async function suggestAnswer(question, previousQuestion, entryId, transcriptionM
       }
     }
     if (serial === answerSerial) {
+      if (feedback) { roundForAnswer.generated = answer.trim(); feedbackGenerating = false; }
       history?.update(entryId, { answer: answer.trim(), generationMs: Date.now() - started, totalProcessingMs: transcriptionMs + Date.now() - started, finishedAt: new Date().toISOString(), status: 'complete' });
-      emit('answer', { question, text: answer.trim(), loading: false });
+      emit(eventType, { question, text: answer.trim(), loading: false });
     }
   } catch (error) {
     if (error.name !== 'AbortError' && serial === answerSerial) {
+      if (feedback) feedbackGenerating = false;
       history?.update(entryId, { status: instantAnswer ? 'fallback' : 'error', answer: instantAnswer, error: error.message, generationMs: Date.now() - started });
-      if (instantAnswer) emit('answer', { question, text: instantAnswer, loading: false });
+      if (instantAnswer) emit(eventType, { question, text: instantAnswer, loading: false });
       else emit('error', error.message);
     }
   }
@@ -242,6 +279,15 @@ function handleFinal(payload, source = 'automatic') {
   const details = typeof payload === 'string' ? { text: payload } : payload;
   const utterance = String(details?.text || '').trim();
   if (!utterance) return;
+  if (mode === 'feedbacker') {
+    if (!feedbackRound || feedbackRound.generated || feedbackGenerating) return;
+    feedbackRound.append(utterance);
+    feedbackAudioMs += details.audioMs || 0;
+    feedbackTranscriptionMs += details.transcriptionMs || 0;
+    history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
+    emit('feedback-transcript', feedbackRound.snapshot());
+    return;
+  }
   if (mode === 'mock') {
     const command = mockCommand(utterance);
     if (command === 'start' || command === 'repeat') {
@@ -293,16 +339,16 @@ app.whenReady().then(() => {
   ipcMain.handle('session:start', async (_event, options) => {
     stopSession();
     usageTotals = { input: 0, cached: 0, output: 0, answers: 0 };
-    mode = options?.mode === 'mock' ? 'mock' : 'live';
+    mode = ['mock', 'feedbacker'].includes(options?.mode) ? options.mode : 'live';
     provider = mode === 'mock' ? 'offline' : options?.provider === 'api' ? 'api' : options?.provider === 'codex' ? 'codex' : 'offline';
-    captureMode = mode === 'mock' ? 'automatic' : options?.captureMode === 'manual' ? 'manual' : 'automatic';
-    if (provider === 'api' && mode === 'live') {
+    captureMode = mode !== 'live' ? 'automatic' : options?.captureMode === 'manual' ? 'manual' : 'automatic';
+    if (provider === 'api' && mode !== 'mock') {
       apiKey = String(options?.apiKey || '').trim();
       if (!apiKey) throw new Error('Enter your own OpenAI API key to use API mode.');
-    } else if (provider === 'codex' && mode === 'live') {
+    } else if (provider === 'codex' && mode !== 'mock') {
       await checkCodexLogin();
     }
-    language = options?.language === 'sr' ? 'sr' : 'en';
+    language = mode === 'feedbacker' ? 'en' : options?.language === 'sr' ? 'sr' : 'en';
     profile = String(options?.profile || '').slice(0, 4000);
     questionGate = new QuestionGate();
     if (mode === 'mock') mockPractice = new MockPractice({ language, category: options?.mockCategory || 'all' });
@@ -318,7 +364,8 @@ app.whenReady().then(() => {
     transcriber = current;
     try {
       await transcriber.connect();
-      history.start({ mode, captureMode, language, provider, model: mode === 'mock' ? MOCK_MODEL : provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL });
+      history.start({ mode, captureMode, language, provider, model: mode === 'mock' ? MOCK_MODEL : provider === 'offline' && mode === 'feedbacker' ? 'asma-scaffold-v1' : provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL });
+      if (mode === 'feedbacker') startFeedbackRound(1);
       const sessionId = sessionSerial;
       manualCapture = new ManualCapture({
         onState: state => {
@@ -356,7 +403,7 @@ app.whenReady().then(() => {
   ipcMain.on('session:audio', (_event, data) => {
     if (!(data?.pcm instanceof ArrayBuffer) || !Number.isFinite(data.durationMs)) return;
     if (manualCapture?.state !== 'idle') manualCapture.audio(new Int16Array(data.pcm));
-    if (captureMode === 'automatic') transcriber?.ingest(data.pcm, data.durationMs);
+    if (captureMode === 'automatic' && !feedbackBusy && !(mode === 'feedbacker' && (feedbackRound?.generated || feedbackGenerating))) transcriber?.ingest(data.pcm, data.durationMs);
   });
   ipcMain.handle('capture:mode', (_event, next) => {
     manualJobSerial++;
@@ -375,6 +422,46 @@ app.whenReady().then(() => {
   ipcMain.handle('mock:begin', () => mode === 'mock' ? showMockQuestion() : null);
   ipcMain.handle('mock:reveal', () => mode === 'mock' ? revealMockAnswer() : null);
   ipcMain.handle('mock:next', () => mode === 'mock' ? showMockQuestion(true) : null);
+  ipcMain.handle('feedback:phase', async (_event, phase) => {
+    if (mode !== 'feedbacker' || !feedbackRound || feedbackRound.generated || feedbackGenerating) return null;
+    try {
+      if (!['question', 'candidate', 'reviewer1', 'reviewer2'].includes(phase)) throw new Error('Unknown workshop speaker');
+      await flushFeedbackSpeech();
+      const snapshot = feedbackRound.setPhase(phase);
+      emit('feedback-round', snapshot);
+      return snapshot;
+    } finally { feedbackBusy = false; }
+  });
+  ipcMain.handle('feedback:rating', (_event, rating) => {
+    if (mode !== 'feedbacker' || !feedbackRound || feedbackRound.generated || feedbackGenerating) return null;
+    feedbackRound.setRating(rating);
+    history?.update(feedbackEntryId, { rating: feedbackRound.rating });
+    emit('feedback-round', feedbackRound.snapshot());
+    return feedbackRound.snapshot();
+  });
+  ipcMain.handle('feedback:generate', async () => {
+    if (mode !== 'feedbacker' || !feedbackRound || feedbackRound.generated || feedbackGenerating) return false;
+    try {
+      await flushFeedbackSpeech();
+      if (!feedbackRound.transcripts.candidate) throw new Error('Capture the candidate answer before generating feedback.');
+      feedbackGenerating = true;
+      const question = `Workshop round ${feedbackRound.number}`;
+      history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
+      suggestAnswer(question, '', feedbackEntryId, feedbackTranscriptionMs, '', true);
+      return true;
+    } finally { feedbackBusy = false; }
+  });
+  ipcMain.handle('feedback:next', async () => {
+    if (mode !== 'feedbacker' || !feedbackRound) return null;
+    try {
+      await flushFeedbackSpeech();
+      answerAbort?.abort();
+      answerSerial++;
+      feedbackGenerating = false;
+      history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', finishedAt: new Date().toISOString(), candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2 });
+      return startFeedbackRound(feedbackRound.number + 1);
+    } finally { feedbackBusy = false; }
+  });
   ipcMain.handle('capture:key', (_event, down) => {
     if (captureMode === 'automatic') {
       captureMode = 'manual';

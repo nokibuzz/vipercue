@@ -1,6 +1,6 @@
 # ViperCue
 
-**A desktop interview companion and offline practice deck.** ViperCue is a floating Electron window for macOS. It transcribes English or Serbian speech locally, keeps the current question visible, and shows a short answer. The interface starts in English; Serbian is available for both the interface and speech recognition.
+**A desktop interview companion, practice deck, and workshop feedback assistant.** ViperCue is a floating Electron window for macOS. It transcribes speech locally and shows a short answer or a concise feedback recap. The interface starts in English; Serbian is available for Interview mode. Feedbacker uses English workshop speech.
 
 Created by [@nokibuzz](https://github.com/nokibuzz).
 
@@ -10,21 +10,23 @@ Created by [@nokibuzz](https://github.com/nokibuzz).
 
 The scene above combines an edited creator portrait, a fictional AI-generated interviewer and an actual app capture floating in front of the meeting page. It is a concept illustration, not a recording of a real meeting. The header viper briefly crouches and lunges on the setup screen and pauses during a live session. The macOS app icon is static. Motion stops when the system requests **Reduce Motion**, in line with [Apple's motion guidance](https://developer.apple.com/design/human-interface-guidelines/motion) and [W3C's reduced-motion technique](https://www.w3.org/WAI/WCAG22/Techniques/css/C39.html).
 
-| Live answer | Offline practice |
-| --- | --- |
-| ![Live question and local answer](portfolio/images/03-live-en.png) | ![Mock question, candidate transcript and prepared answer](portfolio/images/04-mock-practice.png) |
+| Live answer | Offline practice | ASMA Feedbacker |
+| --- | --- | --- |
+| ![Live question and local answer](portfolio/images/03-live-en.png) | ![Mock question, candidate transcript and prepared answer](portfolio/images/04-mock-practice.png) | ![ASMA feedback based on a sample workshop transcript](portfolio/images/09-feedbacker-demo.png) |
 
-## Two ways to use it
+## Interview and Feedbacker workflows
 
-**Live** captures meeting audio from Meet or Teams, detects questions after speech pauses, and displays a concise answer. It skips common introductions and incidental speech. You can also hold Shift to record one question or double tap Shift to record until the next press. The previous answer stays visible until a new question is ready. Answer sources are **Offline** by default, the user's own Codex CLI login, or an OpenAI API key entered for that session. Speech recognition stays local in all three cases.
+**Interview** is the default workflow. Its **Live** mode captures meeting audio from Meet or Teams, detects questions after speech pauses, and displays a concise answer. It skips common introductions and incidental speech. You can also hold Shift to record one question or double tap Shift to record until the next press. The previous answer stays visible until a new question is ready. Answer sources are **Offline** by default, the user's own Codex CLI login, or an OpenAI API key entered for that session. Speech recognition stays local in all three cases.
 
 **Mock** is a microphone based interview rehearsal. Pick a topic or a mixed deck, then click **Start Mock**. ViperCue asks a question from [16 English and Serbian prompts](src/data/mock-interview.md), transcribes your spoken response, and reveals a prepared reference answer when you press **Show Answer** or say “show answer.” Say “next question” or use the button to continue. Saying “start MOC” or “start mock” repeats the active question. Mock always uses the bundled Markdown deck and **zero AI answer tokens**.
+
+**Feedbacker** supports English interview workshops. Select **Feedbacker**, start a session, then click the active speaker: optional **Question**, **Candidate**, **Reviewer 1**, or **Reviewer 2**. The app transcribes each segment locally and keeps their words separate. After the candidate and peer feedback, choose **Auto**, **Good**, **Great**, or **Best** and press **Generate ASMA**. The [ASMA skill](src/skills/asma-feedback.md) asks for a short, spoken **Assessment → Strength → Missing evidence → Actionable improvement** recap grounded in the candidate's words. It uses peer comments to sharpen one point without repeating them. **Next round** starts a fresh transcript. Speaker changes are selected manually; the app does not infer who is talking. Codex is preselected for a generated recap and uses the installed user's own login. Offline offers an honest ASMA checklist with zero AI tokens, not an invented assessment.
 
 The [live offline library](src/data/interview-questions.md) has 47 bilingual entries across HR, Java, React, Python, .NET, DevOps, front-end, data analytics and systems. Answers are starting points for practice; personal examples should use the candidate's real experience.
 
 ## Install
 
-The current macOS package targets **Intel x64**. Download the [ViperCue 0.8.3 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.8.3/ViperCue-0.8.3.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline and Mock. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock and system audio capture permission for Live when prompted.
+The current macOS package targets **Intel x64**. Download the [ViperCue 0.9.0 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.0/ViperCue-0.9.0.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline, Mock, or an Offline ASMA checklist. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock or workshop capture and system audio capture permission for Live when prompted.
 
 To build from a checkout on macOS:
 
@@ -41,17 +43,18 @@ The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/w
 npm run dist:mac
 ```
 
-The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.8.3) contains the distributable DMG.
+The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.0) contains the distributable DMG.
 
 ## First session
 
 1. Choose **English** or **Srpski** for the interface and separately for spoken language.
-2. Choose **Mock** for microphone practice or **Live** for meeting questions. Offline is the default Live answer source.
+2. Leave **Interview** selected for Mock practice or Live meeting questions. Offline is the default Live answer source.
 3. In Mock, pick a topic and click **Start Mock**. Answer aloud, reveal the prepared answer, then advance.
 4. In Live, select system audio for a browser meeting. Use automatic detection, or manual Shift capture when you want explicit control.
-5. Open **History & analytics** after a session. The optional β panel shows usage during a session; its money and quota fields depend on what the selected provider exposes.
+5. For workshop feedback, choose **Feedbacker**, then select the speaker as each person talks. Generate the ASMA recap after the peer reviewers. Click **Next round** for another candidate.
+6. Open **History & analytics** after a session. Feedback rounds are counted separately. The optional β panel shows usage during a session; its money and quota fields depend on what the selected provider exposes.
 
-Window transparency, answer text size, and answer area are adjustable. Local JSON history records question text, timing, model and token counts. Mock practice is summarized separately from Live answer usage. The [automatic question rules](docs/automatic-mode.md) are deterministic and may miss or misclassify unusual introductions; **Start questions** is available when an interviewer transitions without a clear phrase.
+Window transparency, answer text size, and answer area are adjustable. Local JSON history records transcripts, timing, model and token counts. Mock practice and Feedbacker rounds are summarized separately from Live answer usage. The [automatic question rules](docs/automatic-mode.md) are deterministic and may miss or misclassify unusual introductions; **Start questions** is available when an interviewer transitions without a clear phrase.
 
 ## Screen sharing
 
@@ -63,6 +66,6 @@ The [visual walkthrough](portfolio/README.md) includes setup, practice, Live and
 
 ## Privacy and release status
 
-No API key, Codex credential, email address, or interview transcript is committed to this repository. API keys entered in the app are held in memory for the active session. Codex mode invokes the installed user's own CLI login. Offline and Mock make no AI answer request. Interview history stays in the app's local user-data directory; users should review it before sharing diagnostics or backups.
+No API key, Codex credential, email address, or real workshop transcript is committed to this repository. The screenshots use synthetic dialogue. API keys entered in the app are held in memory for the active session. Codex mode invokes the installed user's own CLI login. Offline and Mock make no AI answer request; Feedbacker makes an AI request only when Codex or API is selected and **Generate ASMA** is pressed. Interview and workshop history stay in the app's local user-data directory; users should review it before sharing diagnostics or backups.
 
 This is a working macOS x64 preview, with automated unit tests and a local speech-to-practice smoke test. It is not yet signed or notarized and needs broader device and meeting-platform testing before a production claim. The package is currently `UNLICENSED`; choose a license before allowing reuse.

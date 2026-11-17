@@ -3,8 +3,10 @@
 const el = id => document.getElementById(id);
 let uiLanguage = 'en';
 let mode = 'live';
+let interviewMode = 'live';
 let language = 'en';
 let provider = 'offline';
+let interviewProvider = 'offline';
 let captureMode = 'automatic';
 let captureState = 'idle';
 let questionPhase = 'open';
@@ -19,6 +21,8 @@ let silentNode;
 let audioBuffer = [];
 let usageVisible = false;
 let usageTimer;
+let feedbackSnapshot;
+let feedbackActionBusy = false;
 
 const t = key => window.ViperCueI18n.translate(key, uiLanguage);
 function number(value) { return Number(value || 0).toLocaleString(uiLanguage === 'sr' ? 'sr-RS' : 'en-US'); }
@@ -116,6 +120,12 @@ async function loadHistory() {
       cells.push([t('Practice questions'), number(stats.practice.questions)]);
       cells.push([t('Practice completed'), number(stats.practice.completed)]);
     }
+    if (stats.feedback?.rounds) {
+      cells.push([t('Feedback rounds'), number(stats.feedback.rounds)]);
+      cells.push([t('Completed feedback'), number(stats.feedback.completed)]);
+      cells.push([t('Feedback tokens'), number(stats.feedback.tokens)]);
+      cells.push([t('Feedback wait'), duration(stats.feedback.averageWaitMs)]);
+    }
     for (const [label, value] of cells) {
       const cell = document.createElement('div');
       cell.className = 'dashboard-cell';
@@ -146,7 +156,7 @@ async function loadHistory() {
     box.className = 'history-item';
     const summary = document.createElement('summary');
     const tokens = session.questions.reduce((sum, q) => sum + (q.inputTokens || 0) + (q.outputTokens || 0), 0);
-    summary.textContent = `${new Date(session.startedAt).toLocaleString(uiLanguage === 'sr' ? 'sr-RS' : 'en-US')} · ${session.questions.length} ${t('questions')} · ${number(tokens)} ${t('tokens')}`;
+    summary.textContent = `${new Date(session.startedAt).toLocaleString(uiLanguage === 'sr' ? 'sr-RS' : 'en-US')} · ${session.mode === 'feedbacker' ? t('FEEDBACKER') : session.mode === 'mock' ? 'MOCK' : 'LIVE'} · ${session.questions.length} ${session.mode === 'feedbacker' ? t('rounds') : t('questions')} · ${number(tokens)} ${t('tokens')}`;
     box.append(summary);
     const meta = document.createElement('div');
     meta.className = 'history-meta';
@@ -165,8 +175,17 @@ async function loadHistory() {
       if (q.candidateAnswer) {
         const candidate = document.createElement('p');
         candidate.className = 'history-candidate';
-        candidate.textContent = `${t('Your response')}: ${q.candidateAnswer}`;
+        candidate.textContent = `${session.mode === 'feedbacker' ? t('CANDIDATE') : t('Your response')}: ${q.candidateAnswer}`;
         row.append(candidate);
+      }
+      if (session.mode === 'feedbacker') {
+        for (const [key, label] of [['reviewer1', 'REVIEWER 1'], ['reviewer2', 'REVIEWER 2']]) {
+          if (!q[key]) continue;
+          const peer = document.createElement('p');
+          peer.className = 'history-candidate';
+          peer.textContent = `${t(label)}: ${q[key]}`;
+          row.append(peer);
+        }
       }
       const stats = document.createElement('small');
       stats.textContent = `${t('Speech')} ${Math.round((q.audioMs || 0) / 100) / 10}s · ${t('recognition')} ${Math.round((q.transcriptionMs || 0) / 100) / 10}s · ${t('answer')} ${Math.round((q.generationMs || 0) / 100) / 10}s · ${t('total processing')} ${Math.round((q.totalProcessingMs || 0) / 100) / 10}s · ${t('context')} ${number(q.inputTokens)} ${t('input tokens')} (${number(q.contextCharacters)} ${t('characters')}) · ${t('output')} ${number(q.outputTokens)} · ${q.model}`;
@@ -180,13 +199,13 @@ async function loadHistory() {
 async function refreshUsage() {
   if (!running || !usageVisible) return;
   if (provider === 'offline') {
-    el('usageLimitLabel').textContent = t('Answer library');
+    el('usageLimitLabel').textContent = mode === 'feedbacker' ? t('ASMA scaffold') : t('Answer library');
     el('usageLast').textContent = t('0 tokens');
     el('usageSession').textContent = t('0 tokens');
-    el('usageLimits').textContent = t('Local library');
+    el('usageLimits').textContent = mode === 'feedbacker' ? t('Local checklist') : t('Local library');
     el('usageCredits').textContent = t('Not used');
     el('usageMoney').textContent = t('0 for AI answers');
-    el('usageNote').textContent = t('Local Whisper + Markdown answers; no AI calls.');
+    el('usageNote').textContent = mode === 'feedbacker' ? t('Local Whisper + ASMA checklist; no AI calls.') : t('Local Whisper + Markdown answers; no AI calls.');
     el('usageOpen').classList.add('hidden');
     return;
   }
@@ -234,17 +253,34 @@ async function setUsageVisible(value) {
 
 function setMode(next) {
   if (running || starting) return;
+  const enteringFeedback = next === 'feedbacker' && mode !== 'feedbacker';
+  const leavingFeedback = mode === 'feedbacker' && next !== 'feedbacker';
+  if (enteringFeedback) interviewProvider = provider;
   mode = next;
+  if (mode !== 'feedbacker') interviewMode = mode;
+  if (leavingFeedback) setProvider(interviewProvider);
   if (mode === 'mock') setProvider('offline');
+  if (enteringFeedback && provider === 'offline') setProvider('codex');
+  el('interviewWorkflow').classList.toggle('selected', mode !== 'feedbacker');
+  el('feedbackWorkflow').classList.toggle('selected', mode === 'feedbacker');
+  el('interviewModeField').classList.toggle('hidden', mode === 'feedbacker');
+  el('feedbackIntro').classList.toggle('hidden', mode !== 'feedbacker');
+  el('shiftNote').classList.toggle('hidden', mode === 'feedbacker');
+  el('introDescription').textContent = mode === 'feedbacker' ? t('Capture workshop speech and draft evidence-based ASMA feedback.') : t('Choose your language and audio source. Offline mode recognizes speech and finds prepared answers without AI tokens.');
+  el('providerFieldLabel').textContent = mode === 'feedbacker' ? t('FEEDBACK SOURCE') : t('ANSWER SOURCE');
+  el('offlineProviderDescription').textContent = mode === 'feedbacker' ? t('ASMA checklist') : t('0 AI tokens');
+  el('codexProviderDescription').textContent = mode === 'feedbacker' ? t('AI recap') : t('AI answer');
+  el('microphoneOption').textContent = mode === 'feedbacker' ? t('Microphone · room audio') : t('Microphone · fallback');
+  el('spokenLanguageField').classList.toggle('hidden', mode === 'feedbacker');
   el('liveMode').classList.toggle('selected', mode === 'live');
   el('mockMode').classList.toggle('selected', mode === 'mock');
-  el('captureModeField').classList.toggle('hidden', mode === 'mock');
+  el('captureModeField').classList.toggle('hidden', mode !== 'live');
   el('mockCategoryField').classList.toggle('hidden', mode !== 'mock');
   el('providerField').classList.toggle('hidden', mode === 'mock');
   el('sourceField').classList.toggle('hidden', mode === 'mock');
-  el('profileField').classList.toggle('hidden', mode === 'mock');
+  el('profileField').classList.toggle('hidden', mode !== 'live');
   el('apiKeyField').classList.toggle('hidden', mode === 'mock' || provider !== 'api');
-  el('start').textContent = mode === 'mock' ? t('▶ START MOCK') : t('▶ START LIVE');
+  el('start').textContent = mode === 'mock' ? t('▶ START MOCK') : mode === 'feedbacker' ? t('▶ START FEEDBACKER') : t('▶ START LIVE');
 }
 
 function setLanguage(next) {
@@ -257,6 +293,7 @@ function setLanguage(next) {
 function setProvider(next) {
   if (running || starting) return;
   provider = next;
+  if (mode !== 'feedbacker') interviewProvider = next;
   el('offlineProvider').classList.toggle('selected', provider === 'offline');
   el('codexProvider').classList.toggle('selected', provider === 'codex');
   el('apiProvider').classList.toggle('selected', provider === 'api');
@@ -286,6 +323,29 @@ function showMockSpeech(text) {
   node.textContent = text ? `${t('YOUR ANSWER')}: ${text}` : '';
 }
 
+function renderFeedback(snapshot) {
+  feedbackSnapshot = snapshot;
+  const roles = [['question', 'feedbackQuestion', 'QUESTION'], ['candidate', 'feedbackCandidate', 'CANDIDATE'], ['reviewer1', 'feedbackReviewer1', 'REVIEWER 1'], ['reviewer2', 'feedbackReviewer2', 'REVIEWER 2']];
+  for (const [role, id] of roles) el(id).classList.toggle('selected', snapshot.phase === role);
+  for (const [, id] of roles) el(id).disabled = Boolean(snapshot.generated);
+  el('feedbackRating').value = snapshot.rating;
+  el('feedbackRating').disabled = Boolean(snapshot.generated);
+  const lines = roles.filter(([role]) => snapshot.transcripts[role]).map(([role, , label]) => `${t(label)} · ${snapshot.transcripts[role]}`);
+  setText('question', lines.join('\n\n') || t('Listening to the candidate…'), lines.length ? '' : 'placeholder');
+  el('statusText').textContent = `${t('ROUND')} ${snapshot.number} · ${t(roles.find(([role]) => role === snapshot.phase)[2])}`;
+  el('feedbackGenerate').disabled = !snapshot.transcripts.candidate || Boolean(snapshot.generated);
+  if (snapshot.generated) setText('answer', snapshot.generated);
+  else if (!lines.length) setText('answer', t('Capture the candidate and peer reviewers, then generate ASMA feedback.'), 'placeholder');
+}
+
+async function feedbackAction(action) {
+  if (!running || mode !== 'feedbacker' || feedbackActionBusy) return;
+  feedbackActionBusy = true;
+  try { await action(); }
+  catch (error) { setText('answer', String(error.message).replace(/^Error invoking remote method '[^']+': Error: /, ''), 'error'); }
+  finally { feedbackActionBusy = false; }
+}
+
 function downsample(samples, sourceRate) {
   const ratio = sourceRate / 24000;
   const length = Math.floor(samples.length / ratio);
@@ -302,7 +362,7 @@ function downsample(samples, sourceRate) {
 }
 
 async function captureAudio() {
-  const system = mode === 'live' && el('source').value === 'system';
+  const system = mode !== 'mock' && el('source').value === 'system';
   mediaStream = system
     ? await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
     : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -354,30 +414,33 @@ async function start() {
   el('start').disabled = true;
   el('setupError').classList.add('hidden');
   try {
-    await window.overlay.start({ mode, captureMode, language, provider, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
+    await window.overlay.start({ mode, captureMode, language: mode === 'feedbacker' ? 'en' : language, provider, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
     await captureAudio();
     running = true;
     questionPhase = 'open';
     mockResponse = '';
     el('apiKey').value = '';
-    el('questionLabel').textContent = mode === 'mock' ? t('Practice question') : t('QUESTION');
-    el('answerLabel').textContent = mode === 'mock' ? t('MODEL ANSWER') : t('SUGGESTED ANSWER');
-    el('languageBadge').textContent = language.toUpperCase();
+    el('questionLabel').textContent = mode === 'feedbacker' ? t('WORKSHOP TRANSCRIPT') : mode === 'mock' ? t('Practice question') : t('QUESTION');
+    el('answerLabel').textContent = mode === 'feedbacker' ? t('ASMA FEEDBACK') : mode === 'mock' ? t('MODEL ANSWER') : t('SUGGESTED ANSWER');
+    el('languageBadge').textContent = (mode === 'feedbacker' ? 'en' : language).toUpperCase();
     el('providerBadge').textContent = mode === 'mock' || provider === 'offline' ? t('OFFLINE · 0 TOKENS') : provider === 'codex' ? 'CODEX' : 'OPENAI API';
-    el('statusText').textContent = mode === 'mock' ? t('LISTENING TO YOUR ANSWER') : t('LISTENING TO INTERVIEWER');
+    el('statusText').textContent = mode === 'feedbacker' ? t('ROUND 1 · CANDIDATE') : mode === 'mock' ? t('LISTENING TO YOUR ANSWER') : t('LISTENING TO INTERVIEWER');
     el('captureHint').textContent = mode === 'mock' || el('source').value === 'microphone' ? t('MICROPHONE') : t('SYSTEM AUDIO');
-    setText('question', t('Waiting for a question…'), 'placeholder');
-    setText('answer', mode === 'mock' ? t('Speak your answer, then press SHOW ANSWER.') : t('Your answer will appear here.'), 'placeholder');
+    setText('question', mode === 'feedbacker' ? t('Listening to the candidate…') : t('Waiting for a question…'), 'placeholder');
+    setText('answer', mode === 'feedbacker' ? t('Capture the candidate and peer reviewers, then generate ASMA feedback.') : mode === 'mock' ? t('Speak your answer, then press SHOW ANSWER.') : t('Your answer will appear here.'), 'placeholder');
     showMockSpeech('');
-    el('captureModeButton').classList.toggle('hidden', mode === 'mock');
+    el('captureModeButton').classList.toggle('hidden', mode !== 'live');
+    el('feedbackControls').classList.toggle('hidden', mode !== 'feedbacker');
     el('mockReveal').classList.toggle('hidden', mode !== 'mock');
     el('mockNext').classList.toggle('hidden', mode !== 'mock');
     el('mockReveal').disabled = false;
     el('mockNext').disabled = false;
     el('setup').classList.add('hidden');
     el('sessionView').classList.remove('hidden');
+    if (mode === 'feedbacker') renderFeedback({ number: 1, phase: 'candidate', rating: 'auto', transcripts: { question: '', candidate: '', reviewer1: '', reviewer2: '' }, generated: '' });
     await window.overlay.compact(true);
-    setCaptureMode(mode === 'mock' ? 'automatic' : captureMode);
+    if (mode === 'live') setCaptureMode(captureMode);
+    else { el('manualAction').classList.add('hidden'); el('startQuestions').classList.add('hidden'); }
     if (mode === 'live') setCaptureState('idle');
     applyDisplaySettings();
     el('usageLast').textContent = '—';
@@ -415,6 +478,8 @@ async function stop() {
 
 el('liveMode').addEventListener('click', () => setMode('live'));
 el('mockMode').addEventListener('click', () => setMode('mock'));
+el('interviewWorkflow').addEventListener('click', () => setMode(interviewMode));
+el('feedbackWorkflow').addEventListener('click', () => setMode('feedbacker'));
 el('uiEnglish').addEventListener('click', () => setUiLanguage('en'));
 el('uiSerbian').addEventListener('click', () => setUiLanguage('sr'));
 el('autoCapture').addEventListener('click', () => { if (!running && !starting) setCaptureMode('automatic'); });
@@ -434,6 +499,13 @@ el('manualAction').addEventListener('click', () => window.overlay.captureButton(
 el('startQuestions').addEventListener('click', () => window.overlay.startQuestions());
 el('mockReveal').addEventListener('click', () => window.overlay.mockReveal());
 el('mockNext').addEventListener('click', () => window.overlay.mockNext());
+el('feedbackCandidate').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackPhase('candidate')));
+el('feedbackQuestion').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackPhase('question')));
+el('feedbackReviewer1').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackPhase('reviewer1')));
+el('feedbackReviewer2').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackPhase('reviewer2')));
+el('feedbackRating').addEventListener('change', event => feedbackAction(() => window.overlay.feedbackRating(event.target.value)));
+el('feedbackGenerate').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackGenerate()));
+el('feedbackNext').addEventListener('click', () => feedbackAction(() => window.overlay.feedbackNext()));
 el('historyPanel').addEventListener('toggle', () => { if (el('historyPanel').open) loadHistory(); });
 el('historyReveal').addEventListener('click', () => window.overlay.revealHistory());
 el('usageEnabled').addEventListener('change', event => setUsageVisible(event.target.checked));
@@ -448,7 +520,18 @@ window.overlay.onEvent(({ type, payload }) => {
   if (!running && !starting) return;
   if (type === 'partial') {
     if (mode === 'mock') showMockSpeech([mockResponse, payload].filter(Boolean).join(' '));
+    else if (mode === 'feedbacker') el('statusText').textContent = t('TRANSCRIBING WORKSHOP SPEECH');
     else el('statusText').textContent = questionPhase === 'intro' ? t('INTRO · WAITING FOR QUESTIONS') : t('LISTENING FOR A NEW QUESTION');
+  } else if ((type === 'feedback-round' || type === 'feedback-transcript') && mode === 'feedbacker') {
+    renderFeedback(payload);
+    if (type === 'feedback-round' && payload.number > 1 && !payload.transcripts.candidate) setText('answer', t('Capture the candidate and peer reviewers, then generate ASMA feedback.'), 'placeholder');
+  } else if (type === 'feedback-answer' && mode === 'feedbacker') {
+    setText('answer', payload.text || t('Preparing ASMA feedback…'), payload.loading ? 'loading' : '');
+    el('statusText').textContent = payload.loading ? t('PREPARING ASMA FEEDBACK') : t('ASMA READY');
+    if (!payload.loading) {
+      el('feedbackGenerate').disabled = true;
+      for (const id of ['feedbackQuestion', 'feedbackCandidate', 'feedbackReviewer1', 'feedbackReviewer2', 'feedbackRating']) el(id).disabled = true;
+    }
   } else if (type === 'mock-question' && mode === 'mock') {
     mockResponse = '';
     showMockSpeech('');

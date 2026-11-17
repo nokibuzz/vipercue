@@ -113,6 +113,40 @@ async function main() {
     return true;
   })()`);
   await screenshot('05-dashboard-demo.png');
+  await evaluate(`(async()=>{
+    document.getElementById('historyPanel').open=false;
+    document.getElementById('feedbackWorkflow').click();
+    document.getElementById('source').value='microphone';
+    document.getElementById('setup').scrollTop=0;
+    return true;
+  })()`);
+  await screenshot('08-feedbacker-setup.png');
+  await evaluate(`(async()=>{
+    document.getElementById('setup').classList.add('hidden');
+    document.getElementById('sessionView').classList.remove('hidden');
+    document.getElementById('feedbackControls').classList.remove('hidden');
+    document.getElementById('captureModeButton').classList.add('hidden');
+    document.getElementById('mockReveal').classList.add('hidden');
+    document.getElementById('mockNext').classList.add('hidden');
+    document.getElementById('mockSpoken').classList.add('hidden');
+    document.getElementById('questionLabel').textContent='WORKSHOP TRANSCRIPT';
+    document.getElementById('answerLabel').textContent='ASMA FEEDBACK';
+    document.getElementById('statusText').textContent='ROUND 1 · REVIEWER 2';
+    document.getElementById('providerBadge').textContent='CODEX';
+    document.getElementById('languageBadge').textContent='EN';
+    document.getElementById('captureHint').textContent='MICROPHONE';
+    document.getElementById('feedbackReviewer2').classList.add('selected');
+    document.getElementById('feedbackCandidate').classList.remove('selected');
+    document.getElementById('question').textContent='QUESTION · Tell me about a production incident you resolved.\\n\\nCANDIDATE · Our API timed out. I checked logs, found an overloaded database connection pool, adjusted it, and added an alert. The error rate dropped after deployment.\\n\\nREVIEWER 1 · Clear diagnosis and sequence.\\n\\nREVIEWER 2 · I wanted to hear how the team coordinated and whether the alert prevented recurrence.';
+    document.getElementById('question').className='content-text';
+    document.getElementById('answer').textContent='A · Good\\nS · You traced the timeout to the connection pool and said the error rate dropped after deployment.\\nM · The answer did not show how you coordinated with the team or checked for recurrence.\\nA · Next time, add one sentence about who you worked with and what the new alert showed afterward.';
+    document.getElementById('answer').className='content-text';
+    await window.overlay.compact(true);
+    fitAnswer();
+    await new Promise(resolve=>setTimeout(resolve,80));
+    return true;
+  })()`);
+  await screenshot('09-feedbacker-demo.png');
   socket.close();
 }
 
