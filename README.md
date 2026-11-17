@@ -26,7 +26,7 @@ The [live offline library](src/data/interview-questions.md) has 47 bilingual ent
 
 ## Install
 
-The current [ViperCue 0.9.0 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.0/ViperCue-0.9.0.dmg) targets **Intel x64**. It is **unsigned and not notarized**. macOS Gatekeeper can block this downloaded app with an “Apple cannot check it for malicious software” warning; a GitHub download does not make it trusted by Apple. For that specific warning, use Apple's [Privacy & Security → Open Anyway procedure](https://support.apple.com/en-us/102445) after dragging the app to Applications. If the alert says the app **“will damage your computer”** or **“is damaged”**, do not override it; use the [source-build instructions](docs/macos-install.md) and report the exact message. Apple Silicon users should build locally for a native arm64 app.
+The [ViperCue 0.9.1 preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.1) has separate **[Intel x64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-x64.dmg)** and **[Apple Silicon arm64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-arm64.dmg)** DMGs. Both are built natively and ad-hoc signed, but **not notarized**. macOS Gatekeeper can still block a downloaded DMG with an “Apple cannot check it for malicious software” warning; a GitHub download does not make it trusted by Apple. For that specific warning, use Apple's [Privacy & Security → Open Anyway procedure](https://support.apple.com/en-us/102445) after dragging the app to Applications. If the alert says the app **“will damage your computer”** or **“is damaged”**, do not override it; use the [source-build instructions](docs/macos-install.md) and report the exact message.
 
 For a local installation from source on either Intel or Apple Silicon:
 
@@ -40,7 +40,7 @@ npm run install:local
 open "$HOME/Applications/ViperCue.app"
 ```
 
-Use a **native Node.js 22.12 or newer** and install Homebrew if you use the `brew` command. `install:local` builds speech recognition and the app for the current Mac, checks both architectures, and installs into `~/Applications` with a backup of any previous local copy. The first build downloads whisper.cpp and its multilingual model and can take several minutes. See [macOS installation and Gatekeeper details](docs/macos-install.md). Grant Microphone access for Mock or workshop capture and system audio capture permission for Live when prompted.
+Use **macOS 13 or newer** and a **native Node.js 22.12 or newer**. Install Homebrew if you use the `brew` command. `install:local` builds speech recognition and the app for the current Mac, checks the app and helper architectures, and installs into `~/Applications` with a backup of any previous local copy. The first build downloads whisper.cpp and its multilingual model and can take several minutes. See [macOS installation and Gatekeeper details](docs/macos-install.md). Grant Microphone access for Mock or workshop capture and system audio capture permission for Live when prompted.
 
 To build from a checkout on macOS:
 
@@ -57,7 +57,7 @@ The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/w
 npm run dist:mac
 ```
 
-The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.0) contains the unsigned Intel DMG; a local build is the supported fallback until a Developer ID-signed and notarized release is available.
+The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. Use the native DMG for your Mac, or build locally if Gatekeeper blocks it. A Developer ID-signed and notarized release is still needed for installation without a macOS security exception.
 
 ## First session
 

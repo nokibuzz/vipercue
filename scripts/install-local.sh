@@ -36,6 +36,14 @@ lipo "$project_dir/vendor/whisper/build/bin/whisper-cli" -verify_arch "$mac_arch
   echo "The Whisper binary does not contain the expected $mac_arch architecture. Remove the old vendor/whisper/build directory and retry." >&2
   exit 1
 }
+lipo "$project_dir/vendor/shift-monitor/shift-monitor" -verify_arch "$mac_arch" >/dev/null 2>&1 || {
+  echo "The Shift monitor does not contain the expected $mac_arch architecture." >&2
+  exit 1
+}
+codesign --verify --deep --strict "$app_source" || {
+  echo 'The locally built app did not pass code-signature verification.' >&2
+  exit 1
+}
 
 install_dir=${VIPERCUE_LOCAL_INSTALL_DIR:-"$HOME/Applications"}
 destination="$install_dir/ViperCue.app"

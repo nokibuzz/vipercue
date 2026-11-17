@@ -1,0 +1,94 @@
+name: Build macOS previews
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            expected: x86_64
+          - arch: arm64
+            runner: macos-15
+            expected: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install build tools
+        run: |
+          if ! command -v cmake >/dev/null 2>&1; then brew install cmake; fi
+          npm ci
+      - name: Run tests
+        run: npm test
+      - name: Build local speech engine and app helpers
+        run: npm run predist:mac
+      - name: Build ad-hoc signed DMG
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: npx electron-builder --mac dmg "--$BUILD_ARCH" -c.mac.identity=-
+      - name: Verify architecture and package
+        env:
+          EXPECTED_ARCH: ${{ matrix.expected }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          app=dist/mac/ViperCue.app
+          lipo "$app/Contents/MacOS/ViperCue" -verify_arch "$EXPECTED_ARCH"
+          lipo "$app/Contents/Resources/whisper/whisper-cli" -verify_arch "$EXPECTED_ARCH"
+          lipo "$app/Contents/Resources/shift-monitor/shift-monitor" -verify_arch "$EXPECTED_ARCH"
+          test -s "$app/Contents/Resources/whisper/ggml-base.bin"
+          codesign --verify --deep --strict "$app"
+          test -s "dist/ViperCue-0.9.1-$BUILD_ARCH.dmg"
+      - name: Smoke-test bundled speech recognition
+        run: |
+          app=dist/mac/ViperCue.app
+          say -o "$RUNNER_TEMP/vipercue-speech.aiff" 'The database connection pool is overloaded.'
+          afconvert "$RUNNER_TEMP/vipercue-speech.aiff" "$RUNNER_TEMP/vipercue-speech.wav" -f WAVE -d LEI16@16000
+          transcript=$("$app/Contents/Resources/whisper/whisper-cli" \
+            -m "$app/Contents/Resources/whisper/ggml-base.bin" \
+            -f "$RUNNER_TEMP/vipercue-speech.wav" -l en -nt -np -t 4 2>/dev/null)
+          echo "$transcript"
+          echo "$transcript" | grep -Eiq 'database|connection|pool|overloaded'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vipercue-${{ matrix.arch }}
+          path: dist/ViperCue-0.9.1-${{ matrix.arch }}.dmg
+          compression-level: 0
+          retention-days: 7
+
+  release:
+    name: Publish preview release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vipercue-*
+          path: release
+          merge-multiple: true
+      - name: Publish both architectures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          (cd release && sha256sum ./*.dmg > SHA256SUMS.txt)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release/*.dmg release/SHA256SUMS.txt --clobber
+          else
+            gh release create "$tag" release/*.dmg release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "ViperCue $version preview" --notes-file docs/release-0.9.1.md --prerelease
+          fi

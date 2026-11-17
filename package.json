@@ -1,6 +1,6 @@
 {
   "name": "vipercue",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Offline interview practice and live question companion",
   "main": "src/main.cjs",
   "license": "UNLICENSED",
@@ -10,7 +10,7 @@
     "test": "node --test test/*.test.cjs",
     "predist:mac": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh",
     "dist:mac": "electron-builder --mac dmg zip",
-    "pack:local": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh && electron-builder --mac dir",
+    "pack:local": "sh scripts/setup-local-model.sh && node scripts/build-icon.cjs && sh scripts/build-shift-monitor.sh && electron-builder --mac dir -c.mac.identity=-",
     "install:local": "sh scripts/install-local.sh"
   },
   "build": {
@@ -26,6 +26,7 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/ViperCue.icns",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "extraResources": [
         {
           "from": "vendor/whisper/build/bin/whisper-cli",
