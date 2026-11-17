@@ -24,7 +24,7 @@ The [live offline library](src/data/interview-questions.md) has 47 bilingual ent
 
 ## Install
 
-The current macOS package targets **Intel x64**. If a DMG is attached to a GitHub Release, open the ViperCue DMG, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline and Mock. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock and system audio capture permission for Live when prompted.
+The current macOS package targets **Intel x64**. Download the [ViperCue 0.8.1 preview DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.8.1/ViperCue-0.8.1.dmg), open it, drag **ViperCue.app** into Applications, and launch it. The app includes the local Whisper binary and multilingual model, so the installed app needs no account or API key for Offline and Mock. This build is unsigned; macOS may require **Open** from Finder's context menu. Grant Microphone access for Mock and system audio capture permission for Live when prompted.
 
 To build from a checkout on macOS:
 
@@ -41,7 +41,7 @@ The first start downloads and builds [whisper.cpp](https://github.com/ggml-org/w
 npm run dist:mac
 ```
 
-The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. There is no published GitHub Release in this repository yet.
+The package appears in `dist/`, which Git ignores. A fresh checkout does **not** include a model binary. The [preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.8.1) contains the distributable DMG.
 
 ## First session
 
@@ -65,4 +65,4 @@ The [visual walkthrough](portfolio/README.md) includes setup, practice, Live and
 
 No API key, Codex credential, email address, or interview transcript is committed to this repository. API keys entered in the app are held in memory for the active session. Codex mode invokes the installed user's own CLI login. Offline and Mock make no AI answer request. Interview history stays in the app's local user-data directory; users should review it before sharing diagnostics or backups.
 
-This is a working macOS x64 preview, with automated unit tests and a local speech-to-practice smoke test. It is not yet signed or notarized, has no public release artifact, and needs broader device and meeting-platform testing before a production claim. The package is currently `UNLICENSED`; choose a license before allowing reuse.
+This is a working macOS x64 preview, with automated unit tests and a local speech-to-practice smoke test. It is not yet signed or notarized and needs broader device and meeting-platform testing before a production claim. The package is currently `UNLICENSED`; choose a license before allowing reuse.
