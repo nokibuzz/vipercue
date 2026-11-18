@@ -5,19 +5,38 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
+let selectedCodexPath = '';
+
+function setCodexPath(value) {
+  selectedCodexPath = String(value || '').trim();
+}
+
+function executable(file) {
+  try {
+    fs.accessSync(file, fs.constants.X_OK);
+    return fs.statSync(file).isFile();
+  } catch { return false; }
+}
+
 function codexPath() {
+  if (selectedCodexPath) {
+    const file = selectedCodexPath.startsWith('~/')
+      ? path.join(os.homedir(), selectedCodexPath.slice(2)) : selectedCodexPath;
+    if (executable(file)) return file;
+    throw new Error(`Codex CLI is not executable at ${file}. Choose the path printed by "command -v codex" in ViperCue.`);
+  }
   const candidates = [
     process.env.CODEX_CLI_PATH,
     path.join(os.homedir(), '.local', 'bin', 'codex'),
     '/usr/local/bin/codex',
     '/opt/homebrew/bin/codex'
   ].filter(Boolean);
-  for (const candidate of candidates) if (fs.existsSync(candidate)) return candidate;
+  for (const candidate of candidates) if (executable(candidate)) return candidate;
   for (const directory of (process.env.PATH || '').split(path.delimiter)) {
     const candidate = path.join(directory, 'codex');
-    if (fs.existsSync(candidate)) return candidate;
+    if (executable(candidate)) return candidate;
   }
-  throw new Error('Codex CLI was not found. Install it and sign in with your own ChatGPT account.');
+  throw new Error('Codex CLI was not found. In Terminal run "command -v codex", then paste that path into the Codex CLI path field.');
 }
 
 function run(command, args, options = {}) {
@@ -34,10 +53,12 @@ function run(command, args, options = {}) {
 }
 
 async function checkCodexLogin() {
-  const result = await run(codexPath(), ['login', 'status']);
+  const file = codexPath();
+  const result = await run(file, ['login', 'status']);
   if (!/Logged in using ChatGPT/i.test(result.stdout + result.stderr)) {
-    throw new Error('Codex CLI must be signed in with your own ChatGPT account: codex login');
+    throw new Error(`Codex CLI at ${file} is not signed in with ChatGPT. Run "codex login status" and, if needed, "codex login" in Terminal.`);
   }
+  return file;
 }
 
 async function generateWithCodex(prompt, signal, { model = 'gpt-6-luna' } = {}) {
@@ -132,4 +153,4 @@ async function readCodexLimits() {
   });
 }
 
-module.exports = { codexPath, checkCodexLogin, generateWithCodex, readCodexLimits };
+module.exports = { codexPath, setCodexPath, checkCodexLogin, generateWithCodex, readCodexLimits };

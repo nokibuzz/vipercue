@@ -26,7 +26,7 @@ The [live offline library](src/data/interview-questions.md) has 47 bilingual ent
 
 ## Install
 
-The [ViperCue 0.9.1 preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.1) has separate **[Intel x64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-x64.dmg)** and **[Apple Silicon arm64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-arm64.dmg)** DMGs. Both are built natively and ad-hoc signed, but **not notarized**. macOS Gatekeeper can still block a downloaded DMG with an “Apple cannot check it for malicious software” warning; a GitHub download does not make it trusted by Apple. For that specific warning, use Apple's [Privacy & Security → Open Anyway procedure](https://support.apple.com/en-us/102445) after dragging the app to Applications. If the alert says the app **“will damage your computer”** or **“is damaged”**, do not override it; use the [source-build instructions](docs/macos-install.md) and report the exact message.
+The [ViperCue 0.9.2 preview release](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.2) has separate **[Intel x64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.2/ViperCue-0.9.2-x64.dmg)** and **[Apple Silicon arm64](https://github.com/nokibuzz/vipercue/releases/download/v0.9.2/ViperCue-0.9.2-arm64.dmg)** DMGs. Both are built natively and ad-hoc signed, but **not notarized**. macOS Gatekeeper can still block a downloaded DMG with an “Apple cannot check it for malicious software” warning; a GitHub download does not make it trusted by Apple. For that specific warning, use Apple's [Privacy & Security → Open Anyway procedure](https://support.apple.com/en-us/102445) after dragging the app to Applications. If the alert says the app **“will damage your computer”** or **“is damaged”**, do not override it; use the [source-build instructions](docs/macos-install.md) and report the exact message.
 
 For a local installation from source on either Intel or Apple Silicon:
 
@@ -67,6 +67,8 @@ The package appears in `dist/`, which Git ignores. A fresh checkout does **not**
 4. In Live, select system audio for a browser meeting. Use automatic detection, or manual Shift capture when you want explicit control.
 5. For workshop feedback, choose **Feedbacker**, then select the speaker as each person talks. Generate the ASMA recap after the peer reviewers. Click **Next round** for another candidate.
 6. Open **History & analytics** after a session. Feedback rounds are counted separately. The optional β panel shows usage during a session; its money and quota fields depend on what the selected provider exposes.
+
+To use the ChatGPT subscription through Codex CLI, follow the [Codex connection guide](docs/codex-connection.md). In ViperCue, select **Interview → Live → CODEX** or **Feedbacker → CODEX** and click **TEST CODEX CONNECTION**. If the CLI is installed outside standard macOS paths, paste the path from `command -v codex` into **CODEX CLI PATH**.
 
 Window transparency, answer text size, and answer area are adjustable. Local JSON history records transcripts, timing, model and token counts. Mock practice and Feedbacker rounds are summarized separately from Live answer usage. The [automatic question rules](docs/automatic-mode.md) are deterministic and may miss or misclassify unusual introductions; **Start questions** is available when an interviewer transitions without a clear phrase.
 

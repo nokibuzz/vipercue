@@ -2,7 +2,7 @@
 
 ## Why the GitHub DMG is blocked
 
-The ViperCue 0.9.1 release has separate **Intel x64** and **Apple Silicon arm64** DMGs. Both are ad-hoc signed but **not notarized**. This project has no Developer ID signing identity, so the downloaded DMGs cannot pass Apple's Gatekeeper verification without a user exception. GitHub hosting does not sign or notarize an app. The standard “Apple cannot check” warning does not prove the app contains malware; it means Apple has not verified this build.
+The ViperCue 0.9.2 release has separate **Intel x64** and **Apple Silicon arm64** DMGs. Both are ad-hoc signed but **not notarized**. This project has no Developer ID signing identity, so the downloaded DMGs cannot pass Apple's Gatekeeper verification without a user exception. GitHub hosting does not sign or notarize an app. The standard “Apple cannot check” warning does not prove the app contains malware; it means Apple has not verified this build.
 
 For a regular downloadable app that opens on other Macs without an exception, the release must be signed with an Apple **Developer ID Application** certificate, submitted to Apple's notary service, and stapled after approval. That requires an Apple Developer account and signing credentials. See [Apple's Developer ID guide](https://developer.apple.com/developer-id/) and [notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
@@ -16,7 +16,7 @@ If the alert says **“Apple cannot check [the app] for malicious software”**,
 
 See [Apple's official instructions](https://support.apple.com/en-us/102445). If the message instead says **“will damage your computer”** or **“is damaged and can’t be opened”**, do not use a security override or remove quarantine flags. Note the exact wording and use the source build below. Managed Macs may also enforce an organization's app policy.
 
-Download the [arm64 DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-arm64.dmg) for an M-series Mac or the [x64 DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.1/ViperCue-0.9.1-x64.dmg) for Intel. The [release page](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.1) includes SHA-256 checksums; compare them with `shasum -a 256 ~/Downloads/ViperCue-0.9.1-arm64.dmg` (or the x64 filename).
+Download the [arm64 DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.2/ViperCue-0.9.2-arm64.dmg) for an M-series Mac or the [x64 DMG](https://github.com/nokibuzz/vipercue/releases/download/v0.9.2/ViperCue-0.9.2-x64.dmg) for Intel. The [release page](https://github.com/nokibuzz/vipercue/releases/tag/v0.9.2) includes SHA-256 checksums; compare them with `shasum -a 256 ~/Downloads/ViperCue-0.9.2-arm64.dmg` (or the x64 filename).
 
 ## Build and install locally (Intel or Apple Silicon)
 
@@ -36,4 +36,4 @@ open "$HOME/Applications/ViperCue.app"
 
 To run directly from the checkout without installing an app bundle, use `npm start` after `npm install`.
 
-Offline Interview, Mock, and the Offline ASMA checklist need no AI account. Codex feedback uses the user's own installed Codex CLI login; API mode needs their own API key.
+Offline Interview, Mock, and the Offline ASMA checklist need no AI account. Codex feedback uses the user's own installed Codex CLI login; API mode needs their own API key. See the [Codex connection guide](codex-connection.md) if the app cannot find a CLI installed through Homebrew.

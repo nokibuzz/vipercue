@@ -23,6 +23,7 @@ let usageVisible = false;
 let usageTimer;
 let feedbackSnapshot;
 let feedbackActionBusy = false;
+const CODEX_PATH_STORAGE_KEY = 'vipercue-codex-path';
 
 const t = key => window.ViperCueI18n.translate(key, uiLanguage);
 function number(value) { return Number(value || 0).toLocaleString(uiLanguage === 'sr' ? 'sr-RS' : 'en-US'); }
@@ -277,6 +278,7 @@ function setMode(next) {
   el('captureModeField').classList.toggle('hidden', mode !== 'live');
   el('mockCategoryField').classList.toggle('hidden', mode !== 'mock');
   el('providerField').classList.toggle('hidden', mode === 'mock');
+  el('codexPathField').classList.toggle('hidden', mode === 'mock' || provider !== 'codex');
   el('sourceField').classList.toggle('hidden', mode === 'mock');
   el('profileField').classList.toggle('hidden', mode !== 'live');
   el('apiKeyField').classList.toggle('hidden', mode === 'mock' || provider !== 'api');
@@ -298,6 +300,7 @@ function setProvider(next) {
   el('codexProvider').classList.toggle('selected', provider === 'codex');
   el('apiProvider').classList.toggle('selected', provider === 'api');
   el('apiKeyField').classList.toggle('hidden', provider !== 'api' || mode === 'mock');
+  el('codexPathField').classList.toggle('hidden', provider !== 'codex' || mode === 'mock');
 }
 
 function setTransparency(percent) {
@@ -414,7 +417,9 @@ async function start() {
   el('start').disabled = true;
   el('setupError').classList.add('hidden');
   try {
-    await window.overlay.start({ mode, captureMode, language: mode === 'feedbacker' ? 'en' : language, provider, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
+    const codexPath = el('codexPath').value.trim();
+    localStorage.setItem(CODEX_PATH_STORAGE_KEY, codexPath);
+    await window.overlay.start({ mode, captureMode, language: mode === 'feedbacker' ? 'en' : language, provider, codexPath, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
     await captureAudio();
     running = true;
     questionPhase = 'open';
@@ -487,6 +492,26 @@ el('manualCapture').addEventListener('click', () => { if (!running && !starting)
 el('serbian').addEventListener('click', () => setLanguage('sr'));
 el('english').addEventListener('click', () => setLanguage('en'));
 el('codexProvider').addEventListener('click', () => setProvider('codex'));
+el('codexPath').value = localStorage.getItem(CODEX_PATH_STORAGE_KEY) || '';
+el('codexPath').addEventListener('change', () => localStorage.setItem(CODEX_PATH_STORAGE_KEY, el('codexPath').value.trim()));
+el('browseCodex').addEventListener('click', async () => {
+  const chosen = await window.overlay.chooseCodexPath();
+  if (chosen) {
+    el('codexPath').value = chosen;
+    localStorage.setItem(CODEX_PATH_STORAGE_KEY, chosen);
+    el('codexStatus').textContent = t('Path selected. Test the connection before starting.');
+  }
+});
+el('testCodex').addEventListener('click', async () => {
+  el('testCodex').disabled = true;
+  el('codexStatus').textContent = t('Checking Codex…');
+  try {
+    const result = await window.overlay.testCodex(el('codexPath').value.trim());
+    el('codexStatus').textContent = `${t('Connected to ChatGPT through')} ${result.path}`;
+  } catch (error) {
+    el('codexStatus').textContent = String(error.message).replace(/^Error invoking remote method '[^']+': Error: /, '');
+  } finally { el('testCodex').disabled = false; }
+});
 el('offlineProvider').addEventListener('click', () => setProvider('offline'));
 el('apiProvider').addEventListener('click', () => setProvider('api'));
 el('opacity').addEventListener('input', event => setTransparency(event.target.value));

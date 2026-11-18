@@ -1,9 +1,9 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, globalShortcut, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, globalShortcut, screen, shell, dialog } = require('electron');
 const path = require('path');
 const { LocalTranscriber } = require('./local-transcriber.cjs');
-const { checkCodexLogin, generateWithCodex, readCodexLimits } = require('./codex-backend.cjs');
+const { setCodexPath, checkCodexLogin, generateWithCodex, readCodexLimits } = require('./codex-backend.cjs');
 const { makePrompt } = require('./logic.cjs');
 const { QuestionGate } = require('./question-gate.cjs');
 const { ManualCapture } = require('./manual-capture.cjs');
@@ -324,6 +324,17 @@ app.whenReady().then(() => {
   history = new HistoryStore(app.getPath('userData'));
   loadBank();
   loadMockDeck();
+  ipcMain.handle('codex:choose', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      title: 'Choose the Codex CLI executable',
+      properties: ['openFile', 'showHiddenFiles']
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  ipcMain.handle('codex:test', async (_event, file) => {
+    setCodexPath(file);
+    return { path: await checkCodexLogin() };
+  });
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
     callback(contents === window?.webContents && (permission === 'display-capture' || permission === 'media'));
   });
@@ -346,6 +357,7 @@ app.whenReady().then(() => {
       apiKey = String(options?.apiKey || '').trim();
       if (!apiKey) throw new Error('Enter your own OpenAI API key to use API mode.');
     } else if (provider === 'codex' && mode !== 'mock') {
+      setCodexPath(options?.codexPath);
       await checkCodexLogin();
     }
     language = mode === 'feedbacker' ? 'en' : options?.language === 'sr' ? 'sr' : 'en';

@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('overlay', {
   start: options => ipcRenderer.invoke('session:start', options),
+  chooseCodexPath: () => ipcRenderer.invoke('codex:choose'),
+  testCodex: path => ipcRenderer.invoke('codex:test', path),
   stop: () => ipcRenderer.invoke('session:stop'),
   sendAudio: (pcm, durationMs) => ipcRenderer.send('session:audio', { pcm, durationMs }),
   onEvent: callback => {
