@@ -139,9 +139,9 @@ async function loadHistory() {
     }
     const byProvider = document.createElement('div');
     byProvider.className = 'dashboard-breakdown';
-    byProvider.textContent = ['offline', 'codex', 'api'].map(key => {
+    byProvider.textContent = ['offline', 'codex', 'anthropic', 'api'].map(key => {
       const item = stats.byProvider[key];
-      const label = { offline: t('Offline'), codex: 'Codex', api: 'API' }[key];
+      const label = { offline: t('Offline'), codex: 'Codex', anthropic: 'Claude API', api: 'OpenAI API' }[key];
       return `${label}: ${item.questions} ${t('questions')} · ${number(item.averageTokens)} ${t('tokens/question')} · ${duration(item.averageWaitMs)}`;
     }).join('\n');
     dashboard.append(byProvider);
@@ -204,6 +204,7 @@ async function refreshUsage() {
     el('usageLast').textContent = t('0 tokens');
     el('usageSession').textContent = t('0 tokens');
     el('usageLimits').textContent = mode === 'feedbacker' ? t('Local checklist') : t('Local library');
+    el('usageLimits').title = '';
     el('usageCredits').textContent = t('Not used');
     el('usageMoney').textContent = t('0 for AI answers');
     el('usageNote').textContent = mode === 'feedbacker' ? t('Local Whisper + ASMA checklist; no AI calls.') : t('Local Whisper + Markdown answers; no AI calls.');
@@ -211,9 +212,10 @@ async function refreshUsage() {
     return;
   }
   el('usageOpen').classList.remove('hidden');
-  if (provider === 'api') {
+  if (provider === 'api' || provider === 'anthropic') {
     el('usageLimitLabel').textContent = t('Billing');
-    el('usageLimits').textContent = t('API mode');
+    el('usageLimits').textContent = provider === 'anthropic' ? 'Claude API' : t('API mode');
+    el('usageLimits').title = '';
     el('usageCredits').textContent = t('See Billing');
     el('usageMoney').textContent = t('See Billing');
     el('usageNote').textContent = t('API answer tokens; transcription is separate.');
@@ -281,7 +283,10 @@ function setMode(next) {
   el('codexPathField').classList.toggle('hidden', mode === 'mock' || provider !== 'codex');
   el('sourceField').classList.toggle('hidden', mode === 'mock');
   el('profileField').classList.toggle('hidden', mode !== 'live');
-  el('apiKeyField').classList.toggle('hidden', mode === 'mock' || provider !== 'api');
+  el('apiKeyField').classList.toggle('hidden', mode === 'mock' || !['api', 'anthropic'].includes(provider));
+  el('apiKeyLabel').textContent = provider === 'anthropic' ? t('ANTHROPIC API KEY') : t('OPENAI API KEY');
+  el('testAnthropic').classList.toggle('hidden', mode === 'mock' || provider !== 'anthropic');
+  el('anthropicStatus').classList.toggle('hidden', mode === 'mock' || provider !== 'anthropic');
   el('start').textContent = mode === 'mock' ? t('▶ START MOCK') : mode === 'feedbacker' ? t('▶ START FEEDBACKER') : t('▶ START LIVE');
 }
 
@@ -294,12 +299,20 @@ function setLanguage(next) {
 
 function setProvider(next) {
   if (running || starting) return;
+  if (next !== provider && (['api', 'anthropic'].includes(next) || ['api', 'anthropic'].includes(provider))) {
+    el('apiKey').value = '';
+    el('anthropicStatus').textContent = t('Claude API usage is billed to your Anthropic Console account.');
+  }
   provider = next;
   if (mode !== 'feedbacker') interviewProvider = next;
   el('offlineProvider').classList.toggle('selected', provider === 'offline');
   el('codexProvider').classList.toggle('selected', provider === 'codex');
+  el('anthropicProvider').classList.toggle('selected', provider === 'anthropic');
   el('apiProvider').classList.toggle('selected', provider === 'api');
-  el('apiKeyField').classList.toggle('hidden', provider !== 'api' || mode === 'mock');
+  el('apiKeyField').classList.toggle('hidden', !['api', 'anthropic'].includes(provider) || mode === 'mock');
+  el('apiKeyLabel').textContent = provider === 'anthropic' ? t('ANTHROPIC API KEY') : t('OPENAI API KEY');
+  el('testAnthropic').classList.toggle('hidden', provider !== 'anthropic' || mode === 'mock');
+  el('anthropicStatus').classList.toggle('hidden', provider !== 'anthropic' || mode === 'mock');
   el('codexPathField').classList.toggle('hidden', provider !== 'codex' || mode === 'mock');
 }
 
@@ -428,7 +441,7 @@ async function start() {
     el('questionLabel').textContent = mode === 'feedbacker' ? t('WORKSHOP TRANSCRIPT') : mode === 'mock' ? t('Practice question') : t('QUESTION');
     el('answerLabel').textContent = mode === 'feedbacker' ? t('ASMA FEEDBACK') : mode === 'mock' ? t('MODEL ANSWER') : t('SUGGESTED ANSWER');
     el('languageBadge').textContent = (mode === 'feedbacker' ? 'en' : language).toUpperCase();
-    el('providerBadge').textContent = mode === 'mock' || provider === 'offline' ? t('OFFLINE · 0 TOKENS') : provider === 'codex' ? 'CODEX' : 'OPENAI API';
+    el('providerBadge').textContent = mode === 'mock' || provider === 'offline' ? t('OFFLINE · 0 TOKENS') : provider === 'codex' ? 'CODEX' : provider === 'anthropic' ? 'CLAUDE API' : 'OPENAI API';
     el('statusText').textContent = mode === 'feedbacker' ? t('ROUND 1 · CANDIDATE') : mode === 'mock' ? t('LISTENING TO YOUR ANSWER') : t('LISTENING TO INTERVIEWER');
     el('captureHint').textContent = mode === 'mock' || el('source').value === 'microphone' ? t('MICROPHONE') : t('SYSTEM AUDIO');
     setText('question', mode === 'feedbacker' ? t('Listening to the candidate…') : t('Waiting for a question…'), 'placeholder');
@@ -492,6 +505,10 @@ el('manualCapture').addEventListener('click', () => { if (!running && !starting)
 el('serbian').addEventListener('click', () => setLanguage('sr'));
 el('english').addEventListener('click', () => setLanguage('en'));
 el('codexProvider').addEventListener('click', () => setProvider('codex'));
+el('anthropicProvider').addEventListener('click', () => setProvider('anthropic'));
+el('apiKey').addEventListener('input', () => {
+  if (provider === 'anthropic') el('anthropicStatus').textContent = t('Claude API usage is billed to your Anthropic Console account.');
+});
 el('codexPath').value = localStorage.getItem(CODEX_PATH_STORAGE_KEY) || '';
 el('codexPath').addEventListener('change', () => localStorage.setItem(CODEX_PATH_STORAGE_KEY, el('codexPath').value.trim()));
 el('browseCodex').addEventListener('click', async () => {
@@ -511,6 +528,16 @@ el('testCodex').addEventListener('click', async () => {
   } catch (error) {
     el('codexStatus').textContent = String(error.message).replace(/^Error invoking remote method '[^']+': Error: /, '');
   } finally { el('testCodex').disabled = false; }
+});
+el('testAnthropic').addEventListener('click', async () => {
+  el('testAnthropic').disabled = true;
+  el('anthropicStatus').textContent = t('Checking Claude…');
+  try {
+    const result = await window.overlay.testAnthropic(el('apiKey').value.trim());
+    el('anthropicStatus').textContent = `${t('Connected to Claude API ·')} ${result.model}`;
+  } catch (error) {
+    el('anthropicStatus').textContent = String(error.message).replace(/^Error invoking remote method '[^']+': Error: /, '');
+  } finally { el('testAnthropic').disabled = false; }
 });
 el('offlineProvider').addEventListener('click', () => setProvider('offline'));
 el('apiProvider').addEventListener('click', () => setProvider('api'));

@@ -40,3 +40,12 @@ test('dashboard reports mock practice separately from live AI usage', () => {
   assert.equal(data.tokens, 0);
   assert.deepEqual(data.practice, { questions: 2, completed: 1, averageResponseMs: 12000 });
 });
+
+test('dashboard includes Claude API usage under its own provider', () => {
+  const data = summarize([{ mode: 'live', provider: 'anthropic', questions: [
+    { status: 'complete', transcriptionMs: 800, generationMs: 900, totalProcessingMs: 1700, inputTokens: 24, outputTokens: 18 }
+  ] }]);
+  assert.equal(data.byProvider.anthropic.questions, 1);
+  assert.equal(data.byProvider.anthropic.averageTokens, 42);
+  assert.equal(data.byProvider.codex.questions, 0);
+});

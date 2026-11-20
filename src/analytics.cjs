@@ -28,7 +28,7 @@ function summarize(sessions) {
     p90WaitMs: percentile(items.map(item => item.totalProcessingMs), 0.9)
   });
   const byProvider = {};
-  for (const name of ['offline', 'codex', 'api']) {
+  for (const name of ['offline', 'codex', 'anthropic', 'api']) {
     const items = answered.filter(item => item.provider === name);
     byProvider[name] = { ...metrics(items), matched: items.filter(item => item.status === 'complete').length };
   }

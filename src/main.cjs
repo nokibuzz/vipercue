@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, globalShortcut, s
 const path = require('path');
 const { LocalTranscriber } = require('./local-transcriber.cjs');
 const { setCodexPath, checkCodexLogin, generateWithCodex, readCodexLimits } = require('./codex-backend.cjs');
+const { CLAUDE_MODEL, testAnthropicKey, generateWithClaude } = require('./anthropic-backend.cjs');
 const { makePrompt } = require('./logic.cjs');
 const { QuestionGate } = require('./question-gate.cjs');
 const { ManualCapture } = require('./manual-capture.cjs');
@@ -169,7 +170,7 @@ function startFeedbackRound(number) {
   feedbackAudioMs = 0;
   feedbackTranscriptionMs = 0;
   feedbackGenerating = false;
-  feedbackEntryId = history?.question({ question: '', answer: '', candidateAnswer: '', reviewer1: '', reviewer2: '', rating: 'auto', source: 'feedbacker', audioMs: 0, transcriptionMs: 0, inputTokens: 0, outputTokens: 0, contextCharacters: 0, model: provider === 'offline' ? 'asma-scaffold-v1' : provider === 'codex' ? CODEX_MODEL : API_MODEL, status: 'capturing', askedAt: new Date().toISOString() });
+  feedbackEntryId = history?.question({ question: '', answer: '', candidateAnswer: '', reviewer1: '', reviewer2: '', rating: 'auto', source: 'feedbacker', audioMs: 0, transcriptionMs: 0, inputTokens: 0, outputTokens: 0, contextCharacters: 0, model: provider === 'offline' ? 'asma-scaffold-v1' : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL, status: 'capturing', askedAt: new Date().toISOString() });
   emit('feedback-round', feedbackRound.snapshot());
   return feedbackRound.snapshot();
 }
@@ -182,7 +183,7 @@ async function flushFeedbackSpeech() {
 }
 
 async function suggestAnswer(question, previousQuestion, entryId, transcriptionMs, instantAnswer = '', feedback = false) {
-  if (provider === 'api' && !apiKey) return;
+  if ((provider === 'api' || provider === 'anthropic') && !apiKey) return;
   answerAbort?.abort();
   const abort = new AbortController();
   answerAbort = abort;
@@ -190,7 +191,7 @@ async function suggestAnswer(question, previousQuestion, entryId, transcriptionM
   const roundForAnswer = feedback ? feedbackRound : null;
   const prompt = provider === 'offline' ? '' : feedback ? makeAsmaPrompt(roundForAnswer) : makePrompt(question, previousQuestion, profile);
   const started = Date.now();
-  const model = provider === 'offline' ? feedback ? 'asma-scaffold-v1' : OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL;
+  const model = provider === 'offline' ? feedback ? 'asma-scaffold-v1' : OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL;
   history?.update(entryId, { model, contextCharacters: provider === 'offline' ? 0 : prompt.length, generationStartedAt: new Date(started).toISOString(), status: 'generating' });
   let answer = '';
   const eventType = feedback ? 'feedback-answer' : 'answer';
@@ -208,6 +209,21 @@ async function suggestAnswer(question, previousQuestion, entryId, transcriptionM
     }
     if (provider === 'codex') {
       const result = await generateWithCodex(prompt, abort.signal, { model });
+      if (serial === answerSerial) {
+        if (feedback) { roundForAnswer.generated = result.text; feedbackGenerating = false; }
+        const tokens = recordUsage(result.usage) || {};
+        history?.update(entryId, { answer: result.text, ...tokens, generationMs: Date.now() - started, totalProcessingMs: transcriptionMs + Date.now() - started, finishedAt: new Date().toISOString(), status: 'complete' });
+        emit(eventType, { question, text: result.text, loading: false });
+      }
+      return;
+    }
+    if (provider === 'anthropic') {
+      const result = await generateWithClaude(prompt, apiKey, abort.signal, {
+        model, maxTokens: feedback ? 240 : 140,
+        onDelta: text => {
+          if (serial === answerSerial && (!instantAnswer || text.trim().length >= 60)) emit(eventType, { question, text, loading: true });
+        }
+      });
       if (serial === answerSerial) {
         if (feedback) { roundForAnswer.generated = result.text; feedbackGenerating = false; }
         const tokens = recordUsage(result.usage) || {};
@@ -316,7 +332,7 @@ function handleFinal(payload, source = 'automatic') {
   currentQuestion = utterance;
   emit('question', utterance);
   const instant = provider === 'offline' ? '' : quickAnswer(utterance, language);
-  const entryId = history?.question({ question: utterance, answer: instant, instantAnswer: Boolean(instant), source, audioMs: details.audioMs || 0, transcriptionMs: details.transcriptionMs || 0, capturedAt: new Date(details.endedAt || Date.now()).toISOString(), model: provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL, status: 'transcribing' });
+  const entryId = history?.question({ question: utterance, answer: instant, instantAnswer: Boolean(instant), source, audioMs: details.audioMs || 0, transcriptionMs: details.transcriptionMs || 0, capturedAt: new Date(details.endedAt || Date.now()).toISOString(), model: provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL, status: 'transcribing' });
   suggestAnswer(utterance, previousQuestion, entryId, details.transcriptionMs || 0, instant);
 }
 
@@ -335,6 +351,7 @@ app.whenReady().then(() => {
     setCodexPath(file);
     return { path: await checkCodexLogin() };
   });
+  ipcMain.handle('anthropic:test', async (_event, key) => testAnthropicKey(String(key || '').trim()));
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
     callback(contents === window?.webContents && (permission === 'display-capture' || permission === 'media'));
   });
@@ -351,11 +368,14 @@ app.whenReady().then(() => {
     stopSession();
     usageTotals = { input: 0, cached: 0, output: 0, answers: 0 };
     mode = ['mock', 'feedbacker'].includes(options?.mode) ? options.mode : 'live';
-    provider = mode === 'mock' ? 'offline' : options?.provider === 'api' ? 'api' : options?.provider === 'codex' ? 'codex' : 'offline';
+    provider = mode === 'mock' ? 'offline' : options?.provider === 'api' ? 'api' : options?.provider === 'codex' ? 'codex' : options?.provider === 'anthropic' ? 'anthropic' : 'offline';
     captureMode = mode !== 'live' ? 'automatic' : options?.captureMode === 'manual' ? 'manual' : 'automatic';
     if (provider === 'api' && mode !== 'mock') {
       apiKey = String(options?.apiKey || '').trim();
       if (!apiKey) throw new Error('Enter your own OpenAI API key to use API mode.');
+    } else if (provider === 'anthropic' && mode !== 'mock') {
+      apiKey = String(options?.apiKey || '').trim();
+      if (!apiKey) throw new Error('Enter your own Anthropic API key to use Claude.');
     } else if (provider === 'codex' && mode !== 'mock') {
       setCodexPath(options?.codexPath);
       await checkCodexLogin();
@@ -376,7 +396,7 @@ app.whenReady().then(() => {
     transcriber = current;
     try {
       await transcriber.connect();
-      history.start({ mode, captureMode, language, provider, model: mode === 'mock' ? MOCK_MODEL : provider === 'offline' && mode === 'feedbacker' ? 'asma-scaffold-v1' : provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : API_MODEL });
+      history.start({ mode, captureMode, language, provider, model: mode === 'mock' ? MOCK_MODEL : provider === 'offline' && mode === 'feedbacker' ? 'asma-scaffold-v1' : provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL });
       if (mode === 'feedbacker') startFeedbackRound(1);
       const sessionId = sessionSerial;
       manualCapture = new ManualCapture({
@@ -503,7 +523,7 @@ app.whenReady().then(() => {
     window.setSize(window.getSize()[0], Math.min(visible ? 660 : 530, screen.getDisplayMatching(window.getBounds()).workArea.height - 20), true);
   });
   ipcMain.handle('usage:read', async () => provider === 'codex' ? readCodexLimits() : null);
-  ipcMain.handle('usage:open', () => { if (provider !== 'offline') shell.openExternal(provider === 'codex' ? 'https://chatgpt.com/settings/usage' : 'https://platform.openai.com/settings/organization/billing/overview'); });
+  ipcMain.handle('usage:open', () => { if (provider !== 'offline') shell.openExternal(provider === 'codex' ? 'https://chatgpt.com/settings/usage' : provider === 'anthropic' ? 'https://platform.claude.com/usage' : 'https://platform.openai.com/settings/organization/billing/overview'); });
   ipcMain.handle('window:close', () => window?.close());
   ipcMain.handle('window:minimize', () => window?.minimize());
   ipcMain.handle('app:version', () => app.getVersion());
