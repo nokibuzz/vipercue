@@ -18,6 +18,8 @@ const { FeedbackRound, makeAsmaPrompt, offlineAsmaScaffold } = require('./feedba
 
 let window;
 let transcriber;
+let facilitatorTranscriber;
+let feedbackMicEnabled = false;
 let apiKey = '';
 let profile = '';
 let mode = 'live';
@@ -41,6 +43,7 @@ let answerSerial = 0;
 let feedbackRound;
 let feedbackEntryId;
 let feedbackBusy = false;
+let feedbackMicBusy = false;
 let feedbackAudioMs = 0;
 let feedbackTranscriptionMs = 0;
 let feedbackGenerating = false;
@@ -110,12 +113,15 @@ function stopSession() {
   answerSerial++;
   transcriber?.close();
   transcriber = undefined;
+  facilitatorTranscriber?.close();
+  facilitatorTranscriber = undefined;
+  feedbackMicEnabled = false;
   manualCapture?.reset();
   manualCapture = undefined;
   stopKeyMonitor?.();
   stopKeyMonitor = undefined;
   if (mockEntryId && mockPractice?.current && !mockPractice.revealed) history?.update(mockEntryId, { status: 'unfinished', candidateAnswer: mockPractice.response });
-  if (feedbackEntryId && feedbackRound) history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
+  if (feedbackEntryId && feedbackRound) history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, feedbackTurns: feedbackRound.turns, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
   history?.finish();
   questionGate = undefined;
   mockPractice = undefined;
@@ -126,6 +132,7 @@ function stopSession() {
   feedbackRound = undefined;
   feedbackEntryId = undefined;
   feedbackBusy = false;
+  feedbackMicBusy = false;
   feedbackAudioMs = 0;
   feedbackTranscriptionMs = 0;
   feedbackGenerating = false;
@@ -170,16 +177,19 @@ function startFeedbackRound(number) {
   feedbackAudioMs = 0;
   feedbackTranscriptionMs = 0;
   feedbackGenerating = false;
-  feedbackEntryId = history?.question({ question: '', answer: '', candidateAnswer: '', reviewer1: '', reviewer2: '', rating: 'auto', source: 'feedbacker', audioMs: 0, transcriptionMs: 0, inputTokens: 0, outputTokens: 0, contextCharacters: 0, model: provider === 'offline' ? 'asma-scaffold-v1' : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL, status: 'capturing', askedAt: new Date().toISOString() });
+  feedbackEntryId = history?.question({ question: '', answer: '', candidateAnswer: '', reviewer1: '', reviewer2: '', feedbackTurns: [], rating: 'auto', source: 'feedbacker', audioMs: 0, transcriptionMs: 0, inputTokens: 0, outputTokens: 0, contextCharacters: 0, model: provider === 'offline' ? 'asma-scaffold-v1' : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL, status: 'capturing', askedAt: new Date().toISOString() });
   emit('feedback-round', feedbackRound.snapshot());
   return feedbackRound.snapshot();
 }
 
-async function flushFeedbackSpeech() {
+async function flushFeedbackSpeech(includeFacilitator = false) {
   feedbackBusy = true;
+  feedbackMicBusy = includeFacilitator;
   transcriber?.finishTurn();
-  await transcriber?.finalQueue;
+  if (includeFacilitator) facilitatorTranscriber?.finishTurn();
+  await Promise.all([transcriber?.finalQueue, includeFacilitator ? facilitatorTranscriber?.finalQueue : null]);
   transcriber?.reset();
+  if (includeFacilitator) facilitatorTranscriber?.reset();
 }
 
 async function suggestAnswer(question, previousQuestion, entryId, transcriptionMs, instantAnswer = '', feedback = false) {
@@ -297,11 +307,12 @@ function handleFinal(payload, source = 'automatic') {
   if (!utterance) return;
   if (mode === 'feedbacker') {
     if (!feedbackRound || feedbackRound.generated || feedbackGenerating) return;
-    feedbackRound.append(utterance);
+    if (source === 'facilitator') feedbackRound.appendAs('question', utterance, details.endedAt || Date.now(), 'microphone');
+    else feedbackRound.appendAs(feedbackRound.phase, utterance, details.endedAt || Date.now(), 'selected');
     feedbackAudioMs += details.audioMs || 0;
     feedbackTranscriptionMs += details.transcriptionMs || 0;
-    history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
-    emit('feedback-transcript', feedbackRound.snapshot());
+    history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, feedbackTurns: feedbackRound.turns, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
+    emit('feedback-transcript', { ...feedbackRound.snapshot(), audioSource: source });
     return;
   }
   if (mode === 'mock') {
@@ -370,6 +381,7 @@ app.whenReady().then(() => {
     mode = ['mock', 'feedbacker'].includes(options?.mode) ? options.mode : 'live';
     provider = mode === 'mock' ? 'offline' : options?.provider === 'api' ? 'api' : options?.provider === 'codex' ? 'codex' : options?.provider === 'anthropic' ? 'anthropic' : 'offline';
     captureMode = mode !== 'live' ? 'automatic' : options?.captureMode === 'manual' ? 'manual' : 'automatic';
+    feedbackMicEnabled = mode === 'feedbacker' && Boolean(options?.feedbackMic);
     if (provider === 'api' && mode !== 'mock') {
       apiKey = String(options?.apiKey || '').trim();
       if (!apiKey) throw new Error('Enter your own OpenAI API key to use API mode.');
@@ -396,6 +408,16 @@ app.whenReady().then(() => {
     transcriber = current;
     try {
       await transcriber.connect();
+      if (feedbackMicEnabled) {
+        const mic = new LocalTranscriber({ language, onEvent: (type, payload) => {
+          if (facilitatorTranscriber !== mic || mode !== 'feedbacker') return;
+          if (type === 'final') handleFinal(payload, 'facilitator');
+          else if (type === 'partial') emit('feedback-mic-partial', payload);
+          else emit(type, payload);
+        } });
+        facilitatorTranscriber = mic;
+        await mic.connect();
+      }
       history.start({ mode, captureMode, language, provider, model: mode === 'mock' ? MOCK_MODEL : provider === 'offline' && mode === 'feedbacker' ? 'asma-scaffold-v1' : provider === 'offline' ? OFFLINE_MODEL : provider === 'codex' ? CODEX_MODEL : provider === 'anthropic' ? CLAUDE_MODEL : API_MODEL });
       if (mode === 'feedbacker') startFeedbackRound(1);
       const sessionId = sessionSerial;
@@ -434,6 +456,10 @@ app.whenReady().then(() => {
   });
   ipcMain.on('session:audio', (_event, data) => {
     if (!(data?.pcm instanceof ArrayBuffer) || !Number.isFinite(data.durationMs)) return;
+    if (data.source === 'facilitator') {
+      if (mode === 'feedbacker' && feedbackMicEnabled && !feedbackMicBusy && !feedbackRound?.generated && !feedbackGenerating) facilitatorTranscriber?.ingest(data.pcm, data.durationMs);
+      return;
+    }
     if (manualCapture?.state !== 'idle') manualCapture.audio(new Int16Array(data.pcm));
     if (captureMode === 'automatic' && !feedbackBusy && !(mode === 'feedbacker' && (feedbackRound?.generated || feedbackGenerating))) transcriber?.ingest(data.pcm, data.durationMs);
   });
@@ -462,7 +488,7 @@ app.whenReady().then(() => {
       const snapshot = feedbackRound.setPhase(phase);
       emit('feedback-round', snapshot);
       return snapshot;
-    } finally { feedbackBusy = false; }
+    } finally { feedbackBusy = false; feedbackMicBusy = false; }
   });
   ipcMain.handle('feedback:rating', (_event, rating) => {
     if (mode !== 'feedbacker' || !feedbackRound || feedbackRound.generated || feedbackGenerating) return null;
@@ -474,25 +500,25 @@ app.whenReady().then(() => {
   ipcMain.handle('feedback:generate', async () => {
     if (mode !== 'feedbacker' || !feedbackRound || feedbackRound.generated || feedbackGenerating) return false;
     try {
-      await flushFeedbackSpeech();
+      await flushFeedbackSpeech(true);
       if (!feedbackRound.transcripts.candidate) throw new Error('Capture the candidate answer before generating feedback.');
       feedbackGenerating = true;
       const question = `Workshop round ${feedbackRound.number}`;
-      history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
+      history?.update(feedbackEntryId, { question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, feedbackTurns: feedbackRound.turns, rating: feedbackRound.rating, audioMs: feedbackAudioMs, transcriptionMs: feedbackTranscriptionMs });
       suggestAnswer(question, '', feedbackEntryId, feedbackTranscriptionMs, '', true);
       return true;
-    } finally { feedbackBusy = false; }
+    } finally { feedbackBusy = false; feedbackMicBusy = false; }
   });
   ipcMain.handle('feedback:next', async () => {
     if (mode !== 'feedbacker' || !feedbackRound) return null;
     try {
-      await flushFeedbackSpeech();
+      await flushFeedbackSpeech(true);
       answerAbort?.abort();
       answerSerial++;
       feedbackGenerating = false;
-      history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', finishedAt: new Date().toISOString(), candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2 });
+      history?.update(feedbackEntryId, { status: feedbackRound.generated ? 'complete' : 'unfinished', finishedAt: new Date().toISOString(), question: feedbackRound.transcripts.question || feedbackRound.transcripts.candidate, candidateAnswer: feedbackRound.transcripts.candidate, reviewer1: feedbackRound.transcripts.reviewer1, reviewer2: feedbackRound.transcripts.reviewer2, feedbackTurns: feedbackRound.turns });
       return startFeedbackRound(feedbackRound.number + 1);
-    } finally { feedbackBusy = false; }
+    } finally { feedbackBusy = false; feedbackMicBusy = false; }
   });
   ipcMain.handle('capture:key', (_event, down) => {
     if (captureMode === 'automatic') {

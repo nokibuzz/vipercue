@@ -20,6 +20,25 @@ test('feedback round keeps candidate and both peer reviewers separate', () => {
   assert.throws(() => round.setPhase('facilitator'));
 });
 
+test('facilitator microphone questions and follow-ups stay separate from candidate speech', () => {
+  const round = new FeedbackRound();
+  round.appendAs('candidate', 'I changed the API contract.', 2000, 'selected');
+  round.appendAs('question', 'What was the impact on clients?', 3000, 'microphone');
+  round.appendAs('question', 'How did you communicate the change?', 1000, 'microphone');
+  round.appendAs('candidate', 'I sent a migration guide.', 4000, 'selected');
+  assert.equal(round.phase, 'candidate');
+  assert.match(round.transcripts.question, /impact on clients/);
+  assert.equal(round.transcripts.question, 'How did you communicate the change? What was the impact on clients?');
+  assert.doesNotMatch(round.transcripts.candidate, /impact on clients/);
+  assert.deepEqual(round.snapshot().turns.map(turn => turn.role), ['question', 'candidate', 'question', 'candidate']);
+  const prompt = makeAsmaPrompt(round);
+  const ordered = JSON.parse(prompt.split('Question and answer order: ')[1].split('\n\n')[0]);
+  assert.deepEqual(ordered.map(turn => turn.speaker), ['facilitator', 'candidate', 'facilitator', 'candidate']);
+  assert.equal(ordered[0].text, 'How did you communicate the change?');
+  assert.match(prompt, /Question and answer order/);
+  assert.match(prompt, /Do not penalize the candidate for a detail the facilitator never asked for/);
+});
+
 test('ASMA prompt requires evidence, concise English and no unsupported red flag', () => {
   const round = new FeedbackRound();
   round.append('I versioned the library and wrote migration notes.');

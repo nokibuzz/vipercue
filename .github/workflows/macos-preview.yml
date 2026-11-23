@@ -53,7 +53,7 @@ jobs:
           lipo "$app/Contents/Resources/shift-monitor/shift-monitor" -verify_arch "$EXPECTED_ARCH"
           test -s "$app/Contents/Resources/whisper/ggml-base.bin"
           codesign --verify --deep --strict "$app"
-          test -s "dist/ViperCue-0.9.3-$BUILD_ARCH.dmg"
+          test -s "dist/ViperCue-0.9.4-$BUILD_ARCH.dmg"
       - name: Smoke-test bundled speech recognition
         env:
           BUILD_ARCH: ${{ matrix.arch }}
@@ -73,7 +73,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: vipercue-${{ matrix.arch }}
-          path: dist/ViperCue-0.9.3-${{ matrix.arch }}.dmg
+          path: dist/ViperCue-0.9.4-${{ matrix.arch }}.dmg
           compression-level: 0
           retention-days: 7
 
@@ -100,5 +100,5 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/*.dmg release/SHA256SUMS.txt --clobber
           else
-            gh release create "$tag" release/*.dmg release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "ViperCue $version preview" --notes-file docs/release-0.9.3.md --prerelease
+            gh release create "$tag" release/*.dmg release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "ViperCue $version preview" --notes-file docs/release-0.9.4.md --prerelease
           fi

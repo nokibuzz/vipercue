@@ -1,6 +1,6 @@
 {
   "name": "vipercue",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Offline interview practice and live question companion",
   "main": "src/main.cjs",
   "license": "UNLICENSED",
@@ -44,7 +44,7 @@
       "extendInfo": {
         "NSAudioCaptureUsageDescription": "Capture meeting audio to show a live transcript.",
         "NSScreenCaptureDescription": "Capture system audio from a meeting window.",
-        "NSMicrophoneUsageDescription": "Use microphone audio when system audio is unavailable."
+        "NSMicrophoneUsageDescription": "Capture your workshop questions and follow-ups, or use microphone audio for practice."
       }
     }
   },

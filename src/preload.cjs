@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('overlay', {
   testCodex: path => ipcRenderer.invoke('codex:test', path),
   testAnthropic: key => ipcRenderer.invoke('anthropic:test', key),
   stop: () => ipcRenderer.invoke('session:stop'),
-  sendAudio: (pcm, durationMs) => ipcRenderer.send('session:audio', { pcm, durationMs }),
+  sendAudio: (pcm, durationMs, source = 'primary') => ipcRenderer.send('session:audio', { pcm, durationMs, source }),
   onEvent: callback => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('session:event', listener);

@@ -13,15 +13,13 @@ let questionPhase = 'open';
 let mockResponse = '';
 let running = false;
 let starting = false;
-let mediaStream;
+let captureStreams = [];
 let audioContext;
-let sourceNode;
-let workletNode;
-let silentNode;
-let audioBuffer = [];
+let captureNodes = [];
 let usageVisible = false;
 let usageTimer;
 let feedbackSnapshot;
+let feedbackMicPartial = '';
 let feedbackActionBusy = false;
 const CODEX_PATH_STORAGE_KEY = 'vipercue-codex-path';
 
@@ -166,20 +164,29 @@ async function loadHistory() {
     const average = complete.length ? Math.round(complete.reduce((sum, q) => sum + (q.totalProcessingMs || 0), 0) / complete.length / 1000 * 10) / 10 : 0;
     meta.textContent = `${session.language?.toUpperCase()} · ${session.captureMode} · ${session.provider} · ${session.model} · ${t('duration')} ${duration}s · ${t('average processing')} ${average}s`;
     box.append(meta);
-    for (const q of session.questions) {
+    for (const [index, q] of session.questions.entries()) {
       const row = document.createElement('div');
       row.className = 'history-question';
       const title = document.createElement('strong');
-      title.textContent = q.question;
+      title.textContent = session.mode === 'feedbacker' && q.feedbackTurns?.length ? `${t('ROUND')} ${index + 1}` : q.question;
       const answer = document.createElement('p');
       answer.textContent = q.answer || t('No suggested answer.');
-      if (q.candidateAnswer) {
+      row.append(title);
+      if (session.mode === 'feedbacker' && q.feedbackTurns?.length) {
+        for (const turn of q.feedbackTurns) {
+          const speech = document.createElement('p');
+          speech.className = 'history-candidate';
+          const label = turn.source === 'microphone' ? t('YOUR MIC · QUESTION') : t({ question: 'QUESTION', candidate: 'CANDIDATE', reviewer1: 'REVIEWER 1', reviewer2: 'REVIEWER 2' }[turn.role] || 'QUESTION');
+          speech.textContent = `${label}: ${turn.text}`;
+          row.append(speech);
+        }
+      } else if (q.candidateAnswer) {
         const candidate = document.createElement('p');
         candidate.className = 'history-candidate';
         candidate.textContent = `${session.mode === 'feedbacker' ? t('CANDIDATE') : t('Your response')}: ${q.candidateAnswer}`;
         row.append(candidate);
       }
-      if (session.mode === 'feedbacker') {
+      if (session.mode === 'feedbacker' && !q.feedbackTurns?.length) {
         for (const [key, label] of [['reviewer1', 'REVIEWER 1'], ['reviewer2', 'REVIEWER 2']]) {
           if (!q[key]) continue;
           const peer = document.createElement('p');
@@ -190,7 +197,7 @@ async function loadHistory() {
       }
       const stats = document.createElement('small');
       stats.textContent = `${t('Speech')} ${Math.round((q.audioMs || 0) / 100) / 10}s · ${t('recognition')} ${Math.round((q.transcriptionMs || 0) / 100) / 10}s · ${t('answer')} ${Math.round((q.generationMs || 0) / 100) / 10}s · ${t('total processing')} ${Math.round((q.totalProcessingMs || 0) / 100) / 10}s · ${t('context')} ${number(q.inputTokens)} ${t('input tokens')} (${number(q.contextCharacters)} ${t('characters')}) · ${t('output')} ${number(q.outputTokens)} · ${q.model}`;
-      row.append(title, answer, stats);
+      row.append(answer, stats);
       box.append(row);
     }
     list.append(box);
@@ -254,6 +261,16 @@ async function setUsageVisible(value) {
   }
 }
 
+function updateFeedbackMicUi() {
+  const feedback = mode === 'feedbacker';
+  const system = el('source').value === 'system';
+  el('feedbackMicField').classList.toggle('hidden', !feedback);
+  el('feedbackMic').disabled = !system;
+  el('feedbackMicNote').textContent = system
+    ? t('System audio follows the selected speaker. Your microphone is transcribed separately as questions and follow-ups. Use headphones to reduce speaker echo.')
+    : t('With one microphone, choose Question, Candidate, or Reviewer manually to label each speaker.');
+}
+
 function setMode(next) {
   if (running || starting) return;
   const enteringFeedback = next === 'feedbacker' && mode !== 'feedbacker';
@@ -282,6 +299,7 @@ function setMode(next) {
   el('providerField').classList.toggle('hidden', mode === 'mock');
   el('codexPathField').classList.toggle('hidden', mode === 'mock' || provider !== 'codex');
   el('sourceField').classList.toggle('hidden', mode === 'mock');
+  updateFeedbackMicUi();
   el('profileField').classList.toggle('hidden', mode !== 'live');
   el('apiKeyField').classList.toggle('hidden', mode === 'mock' || !['api', 'anthropic'].includes(provider));
   el('apiKeyLabel').textContent = provider === 'anthropic' ? t('ANTHROPIC API KEY') : t('OPENAI API KEY');
@@ -346,7 +364,10 @@ function renderFeedback(snapshot) {
   for (const [, id] of roles) el(id).disabled = Boolean(snapshot.generated);
   el('feedbackRating').value = snapshot.rating;
   el('feedbackRating').disabled = Boolean(snapshot.generated);
-  const lines = roles.filter(([role]) => snapshot.transcripts[role]).map(([role, , label]) => `${t(label)} · ${snapshot.transcripts[role]}`);
+  const lines = snapshot.turns?.length
+    ? snapshot.turns.map(turn => `${turn.source === 'microphone' ? t('YOUR MIC · QUESTION') : t(roles.find(([role]) => role === turn.role)?.[2] || 'QUESTION')} · ${turn.text}`)
+    : roles.filter(([role]) => snapshot.transcripts[role]).map(([role, , label]) => `${t(label)} · ${snapshot.transcripts[role]}`);
+  if (feedbackMicPartial) lines.push(`${t('YOUR MIC · QUESTION')} · ${feedbackMicPartial}…`);
   setText('question', lines.join('\n\n') || t('Listening to the candidate…'), lines.length ? '' : 'placeholder');
   el('statusText').textContent = `${t('ROUND')} ${snapshot.number} · ${t(roles.find(([role]) => role === snapshot.phase)[2])}`;
   el('feedbackGenerate').disabled = !snapshot.transcripts.candidate || Boolean(snapshot.generated);
@@ -377,51 +398,70 @@ function downsample(samples, sourceRate) {
   return output;
 }
 
-async function captureAudio() {
+async function captureAudio(feedbackMic = false) {
   const system = mode !== 'mock' && el('source').value === 'system';
-  mediaStream = system
+  const primaryStream = system
     ? await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
     : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-  const track = mediaStream.getAudioTracks()[0];
-  if (!track || track.readyState !== 'live') {
+  captureStreams.push(primaryStream);
+  const primaryTrack = primaryStream.getAudioTracks()[0];
+  if (!primaryTrack || primaryTrack.readyState !== 'live') {
     throw new Error(system ? t('System audio is unavailable. Check recording permission or select the microphone.') : t('Microphone is unavailable. Check its permission.'));
   }
-  track.onended = () => {
-    if (running) {
-      showSetupError(t('Audio source disconnected. Check permissions and restart the session.'));
-      stop();
+  const inputs = [{ stream: primaryStream, source: 'primary' }];
+  if (feedbackMic) {
+    let micStream;
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch {
+      throw new Error(t('Allow microphone access to capture your questions, or turn off the facilitator microphone option.'));
     }
-  };
+    captureStreams.push(micStream);
+    const micTrack = micStream.getAudioTracks()[0];
+    if (!micTrack || micTrack.readyState !== 'live') throw new Error(t('Facilitator microphone is unavailable. Check its permission or turn off this option.'));
+    inputs.push({ stream: micStream, source: 'facilitator' });
+  }
   audioContext = new AudioContext();
   await audioContext.audioWorklet.addModule('audio-worklet.js');
-  sourceNode = audioContext.createMediaStreamSource(mediaStream);
-  workletNode = new AudioWorkletNode(audioContext, 'capture-processor');
-  silentNode = audioContext.createGain();
-  silentNode.gain.value = 0;
-  sourceNode.connect(workletNode).connect(silentNode).connect(audioContext.destination);
-  workletNode.port.onmessage = ({ data }) => {
-    if (!running && !starting) return;
-    const chunk = downsample(data, audioContext.sampleRate);
-    for (const sample of chunk) audioBuffer.push(sample);
-    while (audioBuffer.length >= 4800) {
-      const pcm = Int16Array.from(audioBuffer.splice(0, 4800));
-      window.overlay.sendAudio(pcm.buffer, 200);
-    }
-  };
+  for (const { stream, source } of inputs) {
+    const track = stream.getAudioTracks()[0];
+    track.onended = () => {
+      if (running) {
+        showSetupError(t('Audio source disconnected. Check permissions and restart the session.'));
+        stop();
+      }
+    };
+    const inputNode = audioContext.createMediaStreamSource(stream);
+    const workletNode = new AudioWorkletNode(audioContext, 'capture-processor');
+    const silentNode = audioContext.createGain();
+    silentNode.gain.value = 0;
+    inputNode.connect(workletNode).connect(silentNode).connect(audioContext.destination);
+    captureNodes.push({ inputNode, workletNode, silentNode });
+    const samples = [];
+    workletNode.port.onmessage = ({ data }) => {
+      if (!running && !starting) return;
+      const chunk = downsample(data, audioContext.sampleRate);
+      for (const sample of chunk) samples.push(sample);
+      while (samples.length >= 4800) {
+        const pcm = Int16Array.from(samples.splice(0, 4800));
+        window.overlay.sendAudio(pcm.buffer, 200, source);
+      }
+    };
+  }
 }
 
 function endCapture() {
-  workletNode?.disconnect();
-  sourceNode?.disconnect();
-  silentNode?.disconnect();
-  workletNode = null;
-  sourceNode = null;
-  silentNode = null;
-  mediaStream?.getTracks().forEach(track => track.stop());
-  mediaStream = null;
+  for (const { inputNode, workletNode, silentNode } of captureNodes) {
+    workletNode.port.onmessage = null;
+    workletNode.disconnect();
+    inputNode.disconnect();
+    silentNode.disconnect();
+  }
+  captureNodes = [];
+  for (const stream of captureStreams) stream.getTracks().forEach(track => track.stop());
+  captureStreams = [];
   audioContext?.close();
   audioContext = null;
-  audioBuffer = [];
 }
 
 async function start() {
@@ -431,19 +471,21 @@ async function start() {
   el('setupError').classList.add('hidden');
   try {
     const codexPath = el('codexPath').value.trim();
+    const feedbackMic = mode === 'feedbacker' && el('source').value === 'system' && el('feedbackMic').checked;
     localStorage.setItem(CODEX_PATH_STORAGE_KEY, codexPath);
-    await window.overlay.start({ mode, captureMode, language: mode === 'feedbacker' ? 'en' : language, provider, codexPath, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
-    await captureAudio();
+    await window.overlay.start({ mode, captureMode, feedbackMic, language: mode === 'feedbacker' ? 'en' : language, provider, codexPath, mockCategory: el('mockCategory').value, apiKey: el('apiKey').value, profile: mode === 'live' ? el('profile').value : '' });
+    await captureAudio(feedbackMic);
     running = true;
     questionPhase = 'open';
     mockResponse = '';
+    feedbackMicPartial = '';
     el('apiKey').value = '';
     el('questionLabel').textContent = mode === 'feedbacker' ? t('WORKSHOP TRANSCRIPT') : mode === 'mock' ? t('Practice question') : t('QUESTION');
     el('answerLabel').textContent = mode === 'feedbacker' ? t('ASMA FEEDBACK') : mode === 'mock' ? t('MODEL ANSWER') : t('SUGGESTED ANSWER');
     el('languageBadge').textContent = (mode === 'feedbacker' ? 'en' : language).toUpperCase();
     el('providerBadge').textContent = mode === 'mock' || provider === 'offline' ? t('OFFLINE · 0 TOKENS') : provider === 'codex' ? 'CODEX' : provider === 'anthropic' ? 'CLAUDE API' : 'OPENAI API';
     el('statusText').textContent = mode === 'feedbacker' ? t('ROUND 1 · CANDIDATE') : mode === 'mock' ? t('LISTENING TO YOUR ANSWER') : t('LISTENING TO INTERVIEWER');
-    el('captureHint').textContent = mode === 'mock' || el('source').value === 'microphone' ? t('MICROPHONE') : t('SYSTEM AUDIO');
+    el('captureHint').textContent = feedbackMic ? t('SYSTEM AUDIO + YOUR MIC') : mode === 'mock' || el('source').value === 'microphone' ? t('MICROPHONE') : t('SYSTEM AUDIO');
     setText('question', mode === 'feedbacker' ? t('Listening to the candidate…') : t('Waiting for a question…'), 'placeholder');
     setText('answer', mode === 'feedbacker' ? t('Capture the candidate and peer reviewers, then generate ASMA feedback.') : mode === 'mock' ? t('Speak your answer, then press SHOW ANSWER.') : t('Your answer will appear here.'), 'placeholder');
     showMockSpeech('');
@@ -504,6 +546,7 @@ el('autoCapture').addEventListener('click', () => { if (!running && !starting) s
 el('manualCapture').addEventListener('click', () => { if (!running && !starting) setCaptureMode('manual'); });
 el('serbian').addEventListener('click', () => setLanguage('sr'));
 el('english').addEventListener('click', () => setLanguage('en'));
+el('source').addEventListener('change', updateFeedbackMicUi);
 el('codexProvider').addEventListener('click', () => setProvider('codex'));
 el('anthropicProvider').addEventListener('click', () => setProvider('anthropic'));
 el('apiKey').addEventListener('input', () => {
@@ -570,11 +613,16 @@ el('close').addEventListener('click', () => window.overlay.close());
 el('minimize').addEventListener('click', () => window.overlay.minimize());
 window.overlay.onEvent(({ type, payload }) => {
   if (!running && !starting) return;
-  if (type === 'partial') {
+  if (type === 'feedback-mic-partial' && mode === 'feedbacker') {
+    feedbackMicPartial = payload;
+    if (feedbackSnapshot) renderFeedback(feedbackSnapshot);
+  } else if (type === 'partial') {
     if (mode === 'mock') showMockSpeech([mockResponse, payload].filter(Boolean).join(' '));
     else if (mode === 'feedbacker') el('statusText').textContent = t('TRANSCRIBING WORKSHOP SPEECH');
     else el('statusText').textContent = questionPhase === 'intro' ? t('INTRO · WAITING FOR QUESTIONS') : t('LISTENING FOR A NEW QUESTION');
   } else if ((type === 'feedback-round' || type === 'feedback-transcript') && mode === 'feedbacker') {
+    if (type === 'feedback-round' && payload.number !== feedbackSnapshot?.number) feedbackMicPartial = '';
+    if (type === 'feedback-transcript' && payload.audioSource === 'facilitator') feedbackMicPartial = '';
     renderFeedback(payload);
     if (type === 'feedback-round' && payload.number > 1 && !payload.transcripts.candidate) setText('answer', t('Capture the candidate and peer reviewers, then generate ASMA feedback.'), 'placeholder');
   } else if (type === 'feedback-answer' && mode === 'feedbacker') {
